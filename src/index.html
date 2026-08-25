@@ -14,7 +14,9 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <link rel="stylesheet" href="tailwind.build.css">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Pinned to the exact version the app is built against so a future
+         Chart.js release can't silently change/break production. -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
     <!-- SheetJS is loaded on demand (export/import) to keep first load fast -->
     <script>
         let _xlsxP;
@@ -22,7 +24,7 @@
             if (window.XLSX) return Promise.resolve();
             if (!_xlsxP) _xlsxP = new Promise((res, rej) => {
                 const s = document.createElement('script');
-                s.src = 'https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js';
+                s.src = 'https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js';
                 s.onload = res; s.onerror = rej; document.head.appendChild(s);
             });
             return _xlsxP;
@@ -1215,6 +1217,7 @@
 
                 updateBadge();
                 loadTasks();
+                _startIdle();   // begin the inactivity auto-logout countdown
                 if(!liveSyncInterval) liveSyncInterval = setInterval(() => { if (!document.hidden) loadTasks(); }, 10000);
                 // Weekly backup reminder
                 const _lastBk = parseInt(localStorage.lastBackup || 0);
@@ -1236,6 +1239,7 @@
             document.getElementById('bottom-nav').classList.add('hidden');
             document.getElementById('fab-add').classList.add('hidden');
             if(liveSyncInterval) { clearInterval(liveSyncInterval); liveSyncInterval = null; }
+            _stopIdle();
         }
 
         function updateBadge() {
@@ -1299,6 +1303,36 @@
 
         // ---- Hierarchy / task scoping ----
         const _lc = s => (s || '').toString().trim().toLowerCase();
+
+        // ---- Double-submit guard ----
+        // Stops a rapid re-tap (or an impatient second click during a slow save)
+        // from firing the same mutation twice and inserting duplicate rows.
+        // Keyed per logical action so unrelated saves don't block each other.
+        // Auto-clears after 3s as a backstop so a failure can never lock the action.
+        const _inflight = new Set();
+        function _guard(key) {
+            if (_inflight.has(key)) return false;
+            _inflight.add(key);
+            setTimeout(() => _inflight.delete(key), 3000);
+            return true;
+        }
+        function _release(key) { _inflight.delete(key); }
+
+        // ---- Idle auto sign-out ----
+        // Signs the user out after a stretch of no interaction, so an unattended
+        // shared/floor machine doesn't sit logged in. Any input resets the timer.
+        let _idleTimer = null;
+        const IDLE_MS = 30 * 60 * 1000; // 30 minutes
+        const _IDLE_EVENTS = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'];
+        function _resetIdle() {
+            if (!currentPin) return;
+            if (_idleTimer) clearTimeout(_idleTimer);
+            _idleTimer = setTimeout(() => {
+                if (currentPin) { toast('Signed out after 30 minutes of inactivity.', 'info', 5000); logout(); }
+            }, IDLE_MS);
+        }
+        function _startIdle() { _IDLE_EVENTS.forEach(ev => window.addEventListener(ev, _resetIdle, { passive: true })); _resetIdle(); }
+        function _stopIdle() { if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; } _IDLE_EVENTS.forEach(ev => window.removeEventListener(ev, _resetIdle)); }
 
         function applyTaskScope(rows) {
             const me = _lc(currentUser);
@@ -1739,9 +1773,11 @@
                 finalTimestamp.setFullYear(parseInt(year), parseInt(month) - 1, parseInt(day));
             }
             
-            const { error } = await _client.rpc('secure_add_task', { 
+            if (!_guard('addTask')) return;
+            const { error } = await _client.rpc('secure_add_task', {
                 user_pin: currentPin, t_desc: desc, t_type: type, t_mgr: assignedUser, t_prio: prio, t_status: targetStatus, t_dept: currentDepartment, t_date: finalTimestamp.toISOString()
             });
+            _release('addTask');
 
             if(error) {
                 alert("System Error: " + error.message);
@@ -2233,10 +2269,12 @@
             const agent = currentNumbersAgent();
             const period = document.getElementById('numMonth').value;
             const { total, scored, pass, fail } = getRow(w);
+            if (!_guard('saveWeek:' + agent + ':' + period + ':' + w)) return;
             const { error } = await _client.rpc('secure_save_weekly', {
                 p_pin: currentPin, p_agent: agent, p_period: period, p_week: w,
                 p_total: total, p_scored: scored, p_pass: pass, p_fail: fail
             });
+            _release('saveWeek:' + agent + ':' + period + ':' + w);
             if (error) { alert('Could not save: ' + error.message); return; }
             const btnRow = document.getElementById(`num-${w}-avg`);
             if (btnRow) { btnRow.classList.add('text-green-600'); setTimeout(() => btnRow.classList.remove('text-green-600'), 1200); }
@@ -2595,10 +2633,12 @@
         async function startAux(agent, type) {
             // One open aux per agent — guard against double taps client-side too
             if (_openAuxByAgent()[agent]) { toast(agent + ' is already on an auxiliary.', 'error'); return; }
+            if (!_guard('startAux:' + agent)) return;
             // Writes go through a PIN-verified SECURITY DEFINER RPC (same model
             // as tasks / weekly numbers / coaching) — the table is read-only to
             // the client. See SECURITY_NOTES.md.
             const { error } = await _client.rpc('secure_start_aux', { p_pin: currentPin, p_agent: agent, p_aux_type: type });
+            _release('startAux:' + agent);
             if (error) { alert(error.message || 'Could not start aux — try again.'); return; }
             toast(`${agent} → ${type}`, 'success');
             await loadAux();
@@ -2798,7 +2838,9 @@
             if (_openTrainByAgent()[agent]) { toast(agent + ' is already in a training session.', 'error'); return; }
             const topic = (window.prompt(`Training topic for ${agent}:`, '') || '').trim();
             if (!topic) return;
+            if (!_guard('startTraining:' + agent)) return;
             const { error } = await _client.rpc('secure_start_training', { p_pin: currentPin, p_agent: agent, p_topic: topic });
+            _release('startTraining:' + agent);
             if (error) { alert(error.message || 'Could not start training — try again.'); return; }
             toast(`${agent} → ${topic}`, 'success');
             await loadTraining();
@@ -2982,7 +3024,9 @@
         async function checkIn(agent) {
             if (_isMobileDevice()) { toast('Check-in is available on a computer only.', 'error'); return; }
             if (_openAttByAgent()[agent]) { toast(agent + ' is already checked in.', 'error'); return; }
+            if (!_guard('checkIn:' + agent)) return;
             const { error } = await _client.rpc('secure_check_in', { p_pin: currentPin, p_agent: agent, p_device: 'desktop' });
+            _release('checkIn:' + agent);
             if (error) { alert(error.message || 'Could not check in — try again.'); return; }
             toast(`${agent} checked in`, 'success');
             await loadAttendance();
@@ -3229,7 +3273,12 @@
                 p_new_pin: document.getElementById('au-pin').value.trim()
             };
             if (!payload.p_name) { alert('Name is required.'); return; }
+            // New users must have a PIN; enforce a minimum length client-side too
+            // (the server is the real gate, but this catches weak PINs at entry).
+            if (!id && payload.p_new_pin.length < 4) { alert('Set a passcode of at least 4 digits for a new user.'); return; }
+            if (!_guard('adminSaveUser:' + (id || 'new'))) return;
             const { error } = await _client.rpc('admin_save_user', payload);
+            _release('adminSaveUser:' + (id || 'new'));
             if (error) { alert(error.message || 'Could not save user.'); return; }
             toast('User saved ✓', 'success');
             adminCancelUser();
@@ -3483,7 +3532,9 @@
                 warning_email: gc('warning_email'), deductions_sheet: gc('deductions_sheet'),
                 reviewer_checked: gc('reviewer_checked'), feedback_comments: g('feedback_comments')
             };
+            if (!_guard('saveCoaching:' + (idVal || 'new'))) return;
             const { error } = await _client.rpc('secure_save_coaching', { p_pin: currentPin, p_id: idVal ? parseInt(idVal) : null, p_data: payload });
+            _release('saveCoaching:' + (idVal || 'new'));
             if (error) { alert('Could not save: ' + error.message); return; }
             closeCoachingForm();
             await loadCoaching();
