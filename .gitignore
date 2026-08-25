@@ -3,4 +3,7 @@
 .env.local
 .env.*.local
 node_modules
-src/config.js
+# src/config.js is tracked so Vercel's git-based deploys include it.
+# It holds only the Supabase project URL + anon (public) key, which is
+# already served to every browser — RLS + SECURITY DEFINER RPCs are the
+# real boundary. Never put service_role keys or secrets in this file.
