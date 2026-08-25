@@ -664,7 +664,7 @@
 
                 <!-- Live agent cards -->
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 px-1">Live status</h3>
-                <div id="aux-live" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-6"></div>
+                <div id="aux-live" class="mb-6"></div>
 
                 <!-- Daily totals by aux type -->
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 px-1">Totals for the day</h3>
@@ -2647,28 +2647,42 @@
             } else { alerts.innerHTML = ''; }
 
             // ---- Live agent cards ----
+            // Busy agents get the full card (timer + Stop) since that's the
+            // signal worth surfacing. Available agents — usually most of the
+            // roster — collapse into a compact row with a single "Start aux"
+            // picker, instead of repeating all 5 aux-type buttons per person
+            // (that was the main source of visual noise on this page).
             const live = document.getElementById('aux-live');
-            live.innerHTML = _auxRoster().filter(inPick).map(agent => {
+            const roster = _auxRoster().filter(inPick);
+            const busy = [], available = [];
+            roster.forEach(agent => (open[agent] ? busy : available).push(agent));
+
+            const busyHtml = busy.map(agent => {
                 const cur = open[agent];
-                if (cur) {
-                    return `<div class="bg-white dark:bg-panel rounded-xl border border-amber-300 dark:border-amber-500/40 shadow-sm p-4 flex flex-col gap-2">
-                        <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}${overByAgent[_lc(agent)] ? ' <i class="fa-solid fa-triangle-exclamation text-rose-500 ml-1" title="Over aux limit"></i>' : ''}</span>
-                        <span class="self-start max-w-full truncate text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-full"><i class="fa-solid ${AUX_ICONS[cur.aux_type] || 'fa-stopwatch'} mr-1"></i>${_esc(cur.aux_type)}</span>
-                        <div class="text-3xl font-black tabular-nums text-gray-800 dark:text-white" data-aux-timer="${cur.id}">${_fmtDur(_auxSeconds(cur))}</div>
-                        <button onclick="stopAux(${cur.id})" class="w-full text-xs font-semibold py-2.5 rounded-lg bg-rose-500 hover:bg-red-600 text-white transition-colors"><i class="fa-solid fa-stop mr-1.5"></i>Stop</button>
-                    </div>`;
-                }
-                const btns = AUX_TYPES.map(t =>
-                    `<button onclick="startAux('${agent.replace(/'/g, "\\'")}','${t}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 hover:bg-deepTeal-50 hover:text-deepTeal-600 dark:hover:bg-deepTeal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid ${AUX_ICONS[t]} mr-1"></i>${t}</button>`
-                ).join('');
-                return `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Available</span>
-                    </div>
-                    <div class="flex flex-wrap gap-1.5">${btns}</div>
+                return `<div class="bg-white dark:bg-panel rounded-xl border border-amber-300 dark:border-amber-500/40 shadow-sm p-4 flex flex-col gap-2">
+                    <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}${overByAgent[_lc(agent)] ? ' <i class="fa-solid fa-triangle-exclamation text-rose-500 ml-1" title="Over aux limit"></i>' : ''}</span>
+                    <span class="self-start max-w-full truncate text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-full"><i class="fa-solid ${AUX_ICONS[cur.aux_type] || 'fa-stopwatch'} mr-1"></i>${_esc(cur.aux_type)}</span>
+                    <div class="text-3xl font-black tabular-nums text-gray-800 dark:text-white" data-aux-timer="${cur.id}">${_fmtDur(_auxSeconds(cur))}</div>
+                    <button onclick="stopAux(${cur.id})" class="w-full text-xs font-semibold py-2.5 rounded-lg bg-rose-500 hover:bg-red-600 text-white transition-colors"><i class="fa-solid fa-stop mr-1.5"></i>Stop</button>
                 </div>`;
             }).join('');
+
+            const availableHtml = available.length ? `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm divide-y divide-gray-100 dark:divide-borderline">
+                ${available.map(agent => `
+                <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${_esc(agent)}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Available</span>
+                        <select onchange="if(this.value){startAux('${agent.replace(/'/g, "\\'")}',this.value);this.value='';}" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium pl-2 pr-6 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                            <option value="">Start aux…</option>
+                            ${AUX_TYPES.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('')}
+                        </select>
+                    </div>
+                </div>`).join('')}
+            </div>` : '';
+
+            live.innerHTML = (busyHtml ? `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-3">${busyHtml}</div>` : '') + availableHtml
+                || `<p class="text-center text-gray-400 text-sm py-6">No agents to show.</p>`;
 
             // ---- Totals by aux type ----
             const totals = {}; AUX_TYPES.forEach(t => totals[t] = 0);
