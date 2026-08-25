@@ -237,6 +237,12 @@
         /* Floor status dot ring follows theme */
         #floor-grid{ --floor-ring:#f9fafb; }
         .dark #floor-grid{ --floor-ring:#0B1121; }
+        /* The prebuilt Tailwind CSS is missing max-w-3xl / sm:grid-cols-2, so the
+           floor board was rendering as one full-width column. Size it explicitly:
+           capped panel width, 2 columns on wider screens, 1 on mobile. */
+        #floor-modal > div{ max-width:768px; }
+        #floor-grid{ grid-template-columns:1fr; }
+        @media (min-width:640px){ #floor-grid{ grid-template-columns:1fr 1fr; } }
     </style>
 </head>
 <body class="font-sans antialiased min-h-screen flex flex-col items-center bg-gray-50 text-gray-800 dark:bg-base dark:text-gray-200 selection:bg-deepTeal-500 selection:text-white">
