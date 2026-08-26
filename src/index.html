@@ -714,7 +714,7 @@
                 <div id="trn-agent-summary" class="mb-4"></div>
 
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 px-1">Live status</h3>
-                <div id="trn-live" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-6"></div>
+                <div id="trn-live" class="mb-6"></div>
 
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 px-1">Training log</h3>
                 <div class="overflow-x-auto bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm">
@@ -760,7 +760,7 @@
                 <div id="att-agent-summary" class="mb-4"></div>
 
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 px-1">Live status</h3>
-                <div id="att-live" class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-6"></div>
+                <div id="att-live" class="mb-6"></div>
 
                 <h3 class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2 px-1">Attendance log</h3>
                 <div class="overflow-x-auto bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm">
@@ -2881,26 +2881,36 @@
                 </div>`;
             } else { sumBox.innerHTML = ''; }
 
-            // Live cards
+            // Live cards — busy people keep the full card (timer + Stop); available
+            // people collapse into a compact row (matches the Aux Tracker pattern).
             const live = document.getElementById('trn-live');
-            live.innerHTML = _auxRoster().filter(inPick).map(agent => {
+            const trnRoster = _auxRoster().filter(inPick);
+            const trnBusy = [], trnAvailable = [];
+            trnRoster.forEach(agent => (open[agent] ? trnBusy : trnAvailable).push(agent));
+
+            const trnBusyHtml = trnBusy.map(agent => {
                 const cur = open[agent];
-                if (cur) {
-                    return `<div class="bg-white dark:bg-panel rounded-xl border border-amber-300 dark:border-amber-500/40 shadow-sm p-4 flex flex-col gap-2">
-                        <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
-                        <span class="self-start max-w-full truncate text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-full"><i class="fa-solid fa-graduation-cap mr-1"></i>${_esc(cur.topic)}</span>
-                        <div class="text-3xl font-black tabular-nums text-gray-800 dark:text-white" data-trn-timer="${cur.id}">${_fmtDur(_auxSeconds(cur))}</div>
-                        <button onclick="stopTraining(${cur.id})" class="w-full text-xs font-semibold py-2.5 rounded-lg bg-rose-500 hover:bg-red-600 text-white transition-colors"><i class="fa-solid fa-stop mr-1.5"></i>Stop</button>
-                    </div>`;
-                }
-                return `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm p-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Available</span>
-                    </div>
-                    <button onclick="startTraining('${agent.replace(/'/g, "\\'")}')" ${isToday ? '' : 'disabled'} class="w-full text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 hover:bg-deepTeal-50 hover:text-deepTeal-600 dark:hover:bg-deepTeal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-play mr-1"></i>Start training</button>
+                return `<div class="bg-white dark:bg-panel rounded-xl border border-amber-300 dark:border-amber-500/40 shadow-sm p-4 flex flex-col gap-2">
+                    <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
+                    <span class="self-start max-w-full truncate text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-1 rounded-full"><i class="fa-solid fa-graduation-cap mr-1"></i>${_esc(cur.topic)}</span>
+                    <div class="text-3xl font-black tabular-nums text-gray-800 dark:text-white" data-trn-timer="${cur.id}">${_fmtDur(_auxSeconds(cur))}</div>
+                    <button onclick="stopTraining(${cur.id})" class="w-full text-xs font-semibold py-2.5 rounded-lg bg-rose-500 hover:bg-red-600 text-white transition-colors"><i class="fa-solid fa-stop mr-1.5"></i>Stop</button>
                 </div>`;
             }).join('');
+
+            const trnAvailableHtml = trnAvailable.length ? `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm divide-y divide-gray-100 dark:divide-borderline">
+                ${trnAvailable.map(agent => `
+                <div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${_esc(agent)}</span>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Available</span>
+                        <button onclick="startTraining('${agent.replace(/'/g, "\\'")}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 hover:bg-deepTeal-50 hover:text-deepTeal-600 dark:hover:bg-deepTeal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-play mr-1"></i>Start training</button>
+                    </div>
+                </div>`).join('')}
+            </div>` : '';
+
+            live.innerHTML = (trnBusyHtml ? `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-3">${trnBusyHtml}</div>` : '') + trnAvailableHtml
+                || `<p class="text-center text-gray-400 text-sm py-6">No people to show.</p>`;
 
             // Log table
             const body = document.getElementById('trn-body');
@@ -3066,29 +3076,40 @@
                 </div>`;
             } else { sumBox.innerHTML = ''; }
 
-            // Live cards
+            // Live cards — busy people keep the full card (timer + Check out);
+            // not-in people collapse into a compact row (matches Aux Tracker).
             const live = document.getElementById('att-live');
-            live.innerHTML = _auxRoster().filter(inPick).map(agent => {
+            const attRoster = _auxRoster().filter(inPick);
+            const attIn = [], attOut = [];
+            attRoster.forEach(agent => (open[agent] ? attIn : attOut).push(agent));
+
+            const attInHtml = attIn.map(agent => {
                 const cur = open[agent];
-                if (cur) {
-                    return `<div class="bg-white dark:bg-panel rounded-xl border border-emerald-300 dark:border-emerald-500/40 shadow-sm p-4 flex flex-col gap-2">
-                        <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
-                        <span class="self-start text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-full"><i class="fa-solid fa-circle-check mr-1"></i>In since ${tfmt(cur.check_in)}</span>
-                        <div class="text-3xl font-black tabular-nums text-gray-800 dark:text-white" data-att-timer="${cur.id}">${_fmtDur(_attSeconds(cur))}</div>
-                        <button onclick="checkOut(${cur.id})" class="w-full text-xs font-semibold py-2.5 rounded-lg bg-rose-500 hover:bg-red-600 text-white transition-colors"><i class="fa-solid fa-right-from-bracket mr-1.5"></i>Check out</button>
-                    </div>`;
-                }
-                const btn = onPC
-                    ? `<button onclick="checkIn('${agent.replace(/'/g, "\\'")}')" ${isToday ? '' : 'disabled'} class="w-full text-xs font-semibold py-2.5 rounded-lg bg-deepTeal-600 hover:bg-deepTeal-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-right-to-bracket mr-1.5"></i>Check in</button>`
-                    : `<div class="w-full text-[11px] font-medium py-2.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-400 text-center"><i class="fa-solid fa-desktop mr-1.5"></i>Check in from a computer</div>`;
-                return `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm p-4 flex flex-col gap-3">
-                    <div class="flex items-center justify-between">
-                        <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
-                        <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">Not in</span>
-                    </div>
-                    ${btn}
+                return `<div class="bg-white dark:bg-panel rounded-xl border border-emerald-300 dark:border-emerald-500/40 shadow-sm p-4 flex flex-col gap-2">
+                    <span class="font-semibold text-gray-800 dark:text-white">${_esc(agent)}</span>
+                    <span class="self-start text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-full"><i class="fa-solid fa-circle-check mr-1"></i>In since ${tfmt(cur.check_in)}</span>
+                    <div class="text-3xl font-black tabular-nums text-gray-800 dark:text-white" data-att-timer="${cur.id}">${_fmtDur(_attSeconds(cur))}</div>
+                    <button onclick="checkOut(${cur.id})" class="w-full text-xs font-semibold py-2.5 rounded-lg bg-rose-500 hover:bg-red-600 text-white transition-colors"><i class="fa-solid fa-right-from-bracket mr-1.5"></i>Check out</button>
                 </div>`;
             }).join('');
+
+            const attOutHtml = attOut.length ? `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm divide-y divide-gray-100 dark:divide-borderline">
+                ${attOut.map(agent => {
+                    const btn = onPC
+                        ? `<button onclick="checkIn('${agent.replace(/'/g, "\\'")}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-deepTeal-600 hover:bg-deepTeal-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-right-to-bracket mr-1"></i>Check in</button>`
+                        : `<span class="text-[10px] font-medium text-gray-400"><i class="fa-solid fa-desktop mr-1"></i>PC only</span>`;
+                    return `<div class="flex items-center justify-between gap-3 px-4 py-2.5">
+                        <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${_esc(agent)}</span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-[10px] font-bold uppercase tracking-wide text-gray-400">Not in</span>
+                            ${btn}
+                        </div>
+                    </div>`;
+                }).join('')}
+            </div>` : '';
+
+            live.innerHTML = (attInHtml ? `<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3 mb-3">${attInHtml}</div>` : '') + attOutHtml
+                || `<p class="text-center text-gray-400 text-sm py-6">No people to show.</p>`;
 
             // Log table
             const body = document.getElementById('att-body');
