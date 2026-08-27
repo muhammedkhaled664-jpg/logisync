@@ -420,6 +420,7 @@
                     <h2 id="lbl-newInput" class="text-sm font-semibold text-gray-800 dark:text-white uppercase tracking-tighter">New Priority Input</h2>
                     <div class="flex items-center gap-2">
                         <button type="button" id="manageNamesBtn" onclick="openAdmin()" title="Add or remove names in the assignee list" class="hidden text-[11px] font-semibold text-deepTeal-600 dark:text-deepTeal-300 hover:text-deepTeal-500 px-2.5 py-1 rounded-lg hover:bg-teal-50 dark:hover:bg-deepTeal-500/10 transition-colors whitespace-nowrap"><i class="fa-solid fa-user-gear mr-1.5"></i>Manage names</button>
+                        <button type="button" id="importTasksBtn" onclick="importTasks()" title="Bulk-create tasks from a spreadsheet (needs a Task Description column)" class="hidden text-[11px] font-semibold text-blue-600 dark:text-blue-400 hover:text-blue-500 px-2.5 py-1 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-colors whitespace-nowrap"><i class="fa-solid fa-file-import mr-1.5"></i>Import</button>
                         <span id="slot-counter" class="text-xs font-medium px-3 py-1 bg-gray-100 dark:bg-base rounded text-gray-600 dark:text-gray-400 whitespace-nowrap">Active Tasks: 0</span>
                     </div>
                 </div>
@@ -488,6 +489,7 @@
                         <button onclick="openAdmin()" id="adminBtn" class="hidden text-xs text-deepTeal-700 dark:text-deepTeal-300 font-semibold py-2.5 rounded-lg bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-deepTeal-500/10 dark:to-emerald-500/10 shadow-sm border border-teal-200 dark:border-deepTeal-500/30"><i class="fa-solid fa-users-gear mr-2"></i>Admin · Users &amp; Departments</button>
                         <button onclick="archiveDone()" class="text-xs text-gray-500 hover:text-red-500 font-medium mt-2"><i class="fa-solid fa-trash mr-2"></i>Purge Closed<span id="closedCount"></span></button>
                         <button onclick="purgeParked()" id="purgeParkedBtn" class="hidden text-xs text-gray-500 hover:text-red-500 font-medium"><i class="fa-solid fa-box-archive mr-2"></i>Purge Parked<span id="parkedCount"></span></button>
+                        <button onclick="parkStaleTasks()" id="sweepStaleBtn" title="Move every active task older than 24 hours into the Backlog" class="hidden text-xs text-gray-500 hover:text-amber-600 dark:hover:text-amber-500 font-medium"><i class="fa-solid fa-broom mr-2"></i>Sweep Stale (24h+)</button>
                     </div>
                 </div>
                 
@@ -1281,6 +1283,8 @@
                     document.getElementById('adminBtn').classList.remove('hidden');
                     document.getElementById('purgeParkedBtn').classList.remove('hidden');
                     document.getElementById('manageNamesBtn').classList.remove('hidden');
+                    document.getElementById('sweepStaleBtn').classList.remove('hidden');
+                    document.getElementById('importTasksBtn').classList.remove('hidden');
                 } else {
                     document.getElementById('mobile-leader-controls').classList.add('hidden');
                     document.getElementById('eodBtn').classList.add('hidden');
@@ -1290,6 +1294,8 @@
                     document.getElementById('adminBtn').classList.add('hidden');
                     document.getElementById('purgeParkedBtn').classList.add('hidden');
                     document.getElementById('manageNamesBtn').classList.add('hidden');
+                    document.getElementById('sweepStaleBtn').classList.add('hidden');
+                    document.getElementById('importTasksBtn').classList.add('hidden');
                 }
 
                 updateBadge();
