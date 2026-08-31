@@ -2519,8 +2519,12 @@
         };
         let auxData = [];          // rows for the selected day
         let _auxTicker = null;     // interval that updates running timers
+        let _auxSync = null;       // interval that re-fetches rows from the server
 
-        function _stopAuxTicker() { if (_auxTicker) { clearInterval(_auxTicker); _auxTicker = null; } }
+        function _stopAuxTicker() {
+            if (_auxTicker) { clearInterval(_auxTicker); _auxTicker = null; }
+            if (_auxSync) { clearInterval(_auxSync); _auxSync = null; }
+        }
 
         function _fmtDur(secs) {
             secs = Math.max(0, Math.floor(secs || 0));
@@ -2599,6 +2603,9 @@
             // Live timers refresh once per second while the tab is open
             _stopAuxTicker();
             _auxTicker = setInterval(_tickAux, 1000);
+            // Re-fetch from the server too, so an aux started or stopped on someone
+            // else's device shows up here without anyone reloading the page.
+            _auxSync = setInterval(() => { if (!document.hidden) loadAux(); }, 8000);
         }
 
         let auxLimits = {};    // `${deptLower}||${type}` -> minutes (0 = no limit)
@@ -2798,9 +2805,20 @@
         }
 
         async function stopAux(id) {
+            if (!_guard('stopAux:' + id)) return;
             const row = auxData.find(r => r.id === id);
+            // Optimistic update: close the row locally and repaint straight away so the
+            // card flips out of "on aux" the instant it's tapped. Without this the UI
+            // sat unchanged for two round-trips and people tapped Stop again.
+            const prevEnd = row ? row.end_time : undefined;
+            if (row) { row.end_time = new Date().toISOString(); renderAux(); }
             const { error } = await _client.rpc('secure_stop_aux', { p_pin: currentPin, p_id: id });
-            if (error) { alert(error.message || 'Could not stop aux — try again.'); return; }
+            _release('stopAux:' + id);
+            if (error) {
+                if (row) { row.end_time = prevEnd; renderAux(); }   // roll back on failure
+                alert(error.message || 'Could not stop aux — try again.');
+                return;
+            }
             const dur = row ? Math.round((Date.now() - new Date(row.start_time)) / 1000) : null;
             toast('Aux stopped' + (dur != null ? ` (${_fmtDur(dur)})` : ''), 'success');
             await loadAux();
@@ -2873,7 +2891,11 @@
         /* ===================== TRAINING TRACKER (#3) ===================== */
         let trainingData = [];
         let _trainTicker = null;
-        function _stopTrainTicker() { if (_trainTicker) { clearInterval(_trainTicker); _trainTicker = null; } }
+        let _trainSync = null;
+        function _stopTrainTicker() {
+            if (_trainTicker) { clearInterval(_trainTicker); _trainTicker = null; }
+            if (_trainSync) { clearInterval(_trainSync); _trainSync = null; }
+        }
 
         function _scopeTrainRows(rows) {
             if (currentAccessLevel === 'leader') return rows;
@@ -2903,6 +2925,7 @@
             _stopTrainTicker();
             _stopAttTicker();
             _trainTicker = setInterval(_tickTrain, 1000);
+            _trainSync = setInterval(() => { if (!document.hidden) loadTraining(); }, 8000);
         }
 
         async function loadTraining() {
@@ -3009,9 +3032,17 @@
         }
 
         async function stopTraining(id) {
+            if (!_guard('stopTraining:' + id)) return;
             const row = trainingData.find(r => r.id === id);
+            const prevEnd = row ? row.end_time : undefined;
+            if (row) { row.end_time = new Date().toISOString(); renderTraining(); }   // optimistic
             const { error } = await _client.rpc('secure_stop_training', { p_pin: currentPin, p_id: id });
-            if (error) { alert(error.message || 'Could not stop training — try again.'); return; }
+            _release('stopTraining:' + id);
+            if (error) {
+                if (row) { row.end_time = prevEnd; renderTraining(); }                // roll back
+                alert(error.message || 'Could not stop training — try again.');
+                return;
+            }
             const dur = row ? Math.round((Date.now() - new Date(row.start_time)) / 1000) : null;
             toast('Training stopped' + (dur != null ? ` (${_fmtDur(dur)})` : ''), 'success');
             await loadTraining();
@@ -3055,7 +3086,11 @@
 
         let attendanceData = [];
         let _attTicker = null;
-        function _stopAttTicker() { if (_attTicker) { clearInterval(_attTicker); _attTicker = null; } }
+        let _attSync = null;
+        function _stopAttTicker() {
+            if (_attTicker) { clearInterval(_attTicker); _attTicker = null; }
+            if (_attSync) { clearInterval(_attSync); _attSync = null; }
+        }
 
         function _scopeAttRows(rows) {
             if (currentAccessLevel === 'leader') return rows;
@@ -3092,6 +3127,7 @@
             await loadAttendance();
             _stopAttTicker();
             _attTicker = setInterval(_tickAtt, 1000);
+            _attSync = setInterval(() => { if (!document.hidden) loadAttendance(); }, 8000);
         }
 
         async function loadAttendance() {
@@ -3206,8 +3242,17 @@
         }
 
         async function checkOut(id) {
+            if (!_guard('checkOut:' + id)) return;
+            const row = attendanceData.find(r => r.id === id);
+            const prevOut = row ? row.check_out : undefined;
+            if (row) { row.check_out = new Date().toISOString(); renderAttendance(); }   // optimistic
             const { error } = await _client.rpc('secure_check_out', { p_pin: currentPin, p_id: id });
-            if (error) { alert(error.message || 'Could not check out — try again.'); return; }
+            _release('checkOut:' + id);
+            if (error) {
+                if (row) { row.check_out = prevOut; renderAttendance(); }                // roll back
+                alert(error.message || 'Could not check out — try again.');
+                return;
+            }
             toast('Checked out', 'success');
             await loadAttendance();
         }
