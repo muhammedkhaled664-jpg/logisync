@@ -238,6 +238,13 @@
         #floor-grid{ --floor-ring:#f9fafb; }
         .dark #floor-grid{ --floor-ring:#0B1121; }
 
+        /* Sidebar Tools menu — hide the native disclosure triangle and rotate our
+           own chevron. (Tailwind's group-open: variant isn't in the patched CSS.) */
+        #tools-menu > summary{ list-style:none; }
+        #tools-menu > summary::-webkit-details-marker{ display:none; }
+        #tools-menu .tools-chev{ transition:transform .2s ease; }
+        #tools-menu[open] .tools-chev{ transform:rotate(180deg); }
+
         /* =====================================================================
            TAILWIND BUILD GAP PATCH
            tailwind.build.css (pulled from the Vercel deployment, no source
@@ -361,7 +368,8 @@
         </header>
 
         <div id="mobile-leader-controls" class="md:hidden flex gap-3 mb-8 hidden">
-            <button onclick="copyEOD()" id="mobileEodBtn" class="flex-1 text-xs text-deepTeal-600 dark:text-deepTeal-500 font-medium py-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-deepTeal-500/30 transition-all hidden"><i class="fa-solid fa-clipboard mr-2"></i>Copy Weekly</button>
+            <button onclick="copyEOD('day')" id="mobileEodDayBtn" class="flex-1 text-xs text-deepTeal-600 dark:text-deepTeal-500 font-medium py-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-deepTeal-500/30 transition-all hidden"><i class="fa-solid fa-clipboard-list mr-2"></i>Copy Daily</button>
+            <button onclick="copyEOD('week')" id="mobileEodBtn" class="flex-1 text-xs text-deepTeal-600 dark:text-deepTeal-500 font-medium py-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-deepTeal-500/30 transition-all hidden"><i class="fa-solid fa-clipboard mr-2"></i>Copy Weekly</button>
         </div>
 
         <main class="flex-grow pb-24">
@@ -482,14 +490,25 @@
                     <button onclick="openTraining()" id="tabTraining" class="tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-graduation-cap w-4"></i> Training</button>
                     <button onclick="openAttendance()" id="tabAttendance" class="tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-clock-rotate-left w-4"></i> Attendance</button>
                     <button onclick="openSpiff()" id="tabSpiff" class="tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-clipboard-check w-4"></i> Spiff Validation</button>
-                    <div class="mt-6 flex flex-col gap-2 pt-6 border-t border-gray-200 dark:border-borderline">
-                        <button onclick="copyEOD()" id="eodBtn" class="text-xs text-deepTeal-600 dark:text-deepTeal-500 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-teal-200 hidden"><i class="fa-solid fa-clipboard mr-2"></i>Copy Weekly</button>
-                        <button onclick="exportToCSV()" id="csvBtn" class="text-xs text-teal-600 dark:text-teal-400 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-teal-500/30 hidden"><i class="fa-solid fa-file-csv mr-2"></i>Export .CSV</button>
-                        <button onclick="backupAll()" id="backupBtn" class="text-xs text-indigo-600 dark:text-indigo-400 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-indigo-200 dark:border-indigo-500/30"><i class="fa-solid fa-shield-halved mr-2"></i>Backup All Data</button>
-                        <button onclick="openAdmin()" id="adminBtn" class="hidden text-xs text-deepTeal-700 dark:text-deepTeal-300 font-semibold py-2.5 rounded-lg bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-deepTeal-500/10 dark:to-emerald-500/10 shadow-sm border border-teal-200 dark:border-deepTeal-500/30"><i class="fa-solid fa-users-gear mr-2"></i>Admin · Users &amp; Departments</button>
-                        <button onclick="archiveDone()" class="text-xs text-gray-500 hover:text-red-500 font-medium mt-2"><i class="fa-solid fa-trash mr-2"></i>Purge Closed<span id="closedCount"></span></button>
-                        <button onclick="purgeParked()" id="purgeParkedBtn" class="hidden text-xs text-gray-500 hover:text-red-500 font-medium"><i class="fa-solid fa-box-archive mr-2"></i>Purge Parked<span id="parkedCount"></span></button>
-                        <button onclick="parkStaleTasks()" id="sweepStaleBtn" title="Move every active task older than 24 hours into the Backlog" class="hidden text-xs text-gray-500 hover:text-amber-600 dark:hover:text-amber-500 font-medium"><i class="fa-solid fa-broom mr-2"></i>Sweep Stale (24h+)</button>
+                    <div class="mt-6 pt-6 border-t border-gray-200 dark:border-borderline">
+                        <!-- Admin is the one everyday action, so it stays visible; the rest
+                             collapse into Tools to keep the sidebar from becoming a wall. -->
+                        <button onclick="openAdmin()" id="adminBtn" class="hidden w-full text-xs text-deepTeal-700 dark:text-deepTeal-300 font-semibold py-2.5 rounded-lg bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-deepTeal-500/10 dark:to-emerald-500/10 shadow-sm border border-teal-200 dark:border-deepTeal-500/30 mb-2"><i class="fa-solid fa-users-gear mr-2"></i>Admin · Users &amp; Departments</button>
+
+                        <details id="tools-menu" class="group">
+                            <summary class="flex items-center justify-between cursor-pointer text-xs font-semibold text-gray-500 dark:text-gray-400 py-2.5 px-1 rounded-lg hover:bg-white dark:hover:bg-panel transition-colors"><span><i class="fa-solid fa-toolbox mr-2"></i>Tools &amp; Reports</span><i class="fa-solid fa-chevron-down text-[10px] tools-chev"></i></summary>
+                            <div class="flex flex-col gap-2 mt-2">
+                                <button onclick="copyEOD('day')" id="eodDayBtn" class="text-xs text-deepTeal-600 dark:text-deepTeal-500 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-deepTeal-500/30 hidden"><i class="fa-solid fa-clipboard-list mr-2"></i>Copy Daily</button>
+                                <button onclick="copyEOD('week')" id="eodBtn" class="text-xs text-deepTeal-600 dark:text-deepTeal-500 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-teal-200 hidden"><i class="fa-solid fa-clipboard mr-2"></i>Copy Weekly</button>
+                                <button onclick="exportToCSV()" id="csvBtn" class="text-xs text-teal-600 dark:text-teal-400 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-teal-500/30 hidden"><i class="fa-solid fa-file-csv mr-2"></i>Export .CSV</button>
+                                <button onclick="backupAll()" id="backupBtn" class="text-xs text-indigo-600 dark:text-indigo-400 font-medium py-2.5 rounded-lg bg-white dark:bg-panel shadow-sm border border-indigo-200 dark:border-indigo-500/30"><i class="fa-solid fa-shield-halved mr-2"></i>Backup All Data</button>
+                                <div class="flex flex-col gap-1.5 pt-2 mt-1 border-t border-gray-200 dark:border-borderline">
+                                    <button onclick="parkStaleTasks()" id="sweepStaleBtn" title="Move every active task older than 24 hours into the Backlog" class="hidden text-xs text-gray-500 hover:text-amber-600 dark:hover:text-amber-500 font-medium text-left px-1"><i class="fa-solid fa-broom mr-2"></i>Sweep Stale (24h+)</button>
+                                    <button onclick="archiveDone()" class="text-xs text-gray-500 hover:text-red-500 font-medium text-left px-1"><i class="fa-solid fa-trash mr-2"></i>Purge Closed<span id="closedCount"></span></button>
+                                    <button onclick="purgeParked()" id="purgeParkedBtn" class="hidden text-xs text-gray-500 hover:text-red-500 font-medium text-left px-1"><i class="fa-solid fa-box-archive mr-2"></i>Purge Parked<span id="parkedCount"></span></button>
+                                </div>
+                            </div>
+                        </details>
                     </div>
                 </div>
                 
@@ -1277,7 +1296,9 @@
                 if (isLeader) {
                     document.getElementById('mobile-leader-controls').classList.remove('hidden');
                     document.getElementById('eodBtn').classList.remove('hidden');
+                    document.getElementById('eodDayBtn').classList.remove('hidden');
                     document.getElementById('mobileEodBtn').classList.remove('hidden');
+                    document.getElementById('mobileEodDayBtn').classList.remove('hidden');
                     document.getElementById('csvBtn').classList.remove('hidden');
                     document.getElementById('leadershipBtn').classList.remove('hidden');
                     document.getElementById('adminBtn').classList.remove('hidden');
@@ -1288,7 +1309,9 @@
                 } else {
                     document.getElementById('mobile-leader-controls').classList.add('hidden');
                     document.getElementById('eodBtn').classList.add('hidden');
+                    document.getElementById('eodDayBtn').classList.add('hidden');
                     document.getElementById('mobileEodBtn').classList.add('hidden');
+                    document.getElementById('mobileEodDayBtn').classList.add('hidden');
                     document.getElementById('csvBtn').classList.add('hidden');
                     document.getElementById('leadershipBtn').classList.add('hidden');
                     document.getElementById('adminBtn').classList.add('hidden');
@@ -1937,25 +1960,31 @@
         function scrollToInput() { showBoard(); document.getElementById('input-zone').scrollIntoView({ behavior: 'smooth' }); document.getElementById('tInput').focus(); }
         function toggleStats() { document.getElementById('stats-panel').classList.toggle('hidden'); document.getElementById('mobileTabStats').classList.toggle('active'); }
 
-        async function copyEOD() {
+        // period: 'week' (default) or 'day'. The daily variant is the end-of-shift
+        // handover: same layout, but "closed" is scoped to today only.
+        async function copyEOD(period = 'week') {
+            const isDay = period === 'day';
             const { data } = await _client.rpc('tasks_visible', { p_pin: currentPin }).order('priority', { ascending: false });
             if (!data) return;
-            
+
             let displayData = data;
-            
-            const oneWeekAgo = new Date();
-            oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+            // Cutoff for what counts as "recently closed". For the daily report this
+            // is local midnight today, so it matches the operator's actual shift day.
+            const cutoff = new Date();
+            if (isDay) cutoff.setHours(0, 0, 0, 0);
+            else cutoff.setDate(cutoff.getDate() - 7);
 
             const shiftTasks = displayData.filter(t => {
                 if (t.status === 'ACTIVE') return true;
                 if (t.status === 'DONE') {
                     const taskDate = new Date(t.created_at);
-                    return taskDate >= oneWeekAgo;
+                    return taskDate >= cutoff;
                 }
                 return false;
             });
 
-            if (!shiftTasks || shiftTasks.length === 0) { alert("No records to report for this week."); return; }
+            if (!shiftTasks || shiftTasks.length === 0) { alert(isDay ? "No records to report for today." : "No records to report for this week."); return; }
             
             const roadblocks = shiftTasks.filter(t => t.has_flare && t.status === 'ACTIVE');
             const standardActive = shiftTasks.filter(t => !t.has_flare && t.status === 'ACTIVE');
@@ -1966,10 +1995,13 @@
                 return isNaN(dateObj) ? "N/A" : dateObj.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
             };
 
-            let report = `📊 *${(CFG.reportTitle || 'Weekly Report').toUpperCase()}* | Run Date: ${new Date().toLocaleDateString()}\n`;
+            const reportTitle = isDay
+                ? `${(CFG.brandName || 'Ops')} Daily Handover`.toUpperCase()
+                : (CFG.reportTitle || 'Weekly Report').toUpperCase();
+            let report = `📊 *${reportTitle}* | Run Date: ${new Date().toLocaleDateString()}\n`;
             report += `👤 *Commanding:* ${currentUser} | *Dept:* ${currentDepartment}\n`;
             report += `-------------------------------------------\n`;
-            report += `✅ *Closed This Week:* ${completed.length} | ⚡ *Active:* ${standardActive.length + roadblocks.length} | 🚨 *Critical:* ${roadblocks.length}\n\n`;
+            report += `✅ *Closed ${isDay ? 'Today' : 'This Week'}:* ${completed.length} | ⚡ *Active:* ${standardActive.length + roadblocks.length} | 🚨 *Critical:* ${roadblocks.length}\n\n`;
             
             if (roadblocks.length > 0) {
                 report += `🚨 *CRITICAL THREATS (ACTIVE)*\n`;
@@ -1984,7 +2016,7 @@
             }
             
             if (completed.length > 0) {
-                report += `✅ *COMPLETED THIS WEEK*\n`;
+                report += `✅ *COMPLETED ${isDay ? 'TODAY' : 'THIS WEEK'}*\n`;
                 completed.forEach(t => { report += `• [${t.manager || 'Agent'}] [${formatTaskDate(t.created_at)}] [${t.record_type}] ${t.description}\n`; });
             }
             
@@ -1993,7 +2025,7 @@
             
             if (navigator.clipboard && window.isSecureContext) {
                 navigator.clipboard.writeText(report).then(() => {
-                    alert("Weekly Briefing Copied to Clipboard!");
+                    alert(isDay ? "Daily Handover Copied to Clipboard!" : "Weekly Briefing Copied to Clipboard!");
                 }).catch(err => fallbackCopy(report));
             } else {
                 fallbackCopy(report);
