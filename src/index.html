@@ -304,6 +304,7 @@
         .hover\:text-rose-500:hover{--tw-text-opacity:1;color:rgb(244 63 94/var(--tw-text-opacity,1))}
         .hover\:to-deepTeal-400:hover{--tw-gradient-to:#2dd4bf var(--tw-gradient-to-position)}
 
+        .dark\:bg-gray-500\/10:is(.dark *){background-color:rgba(107,114,128,.1)}
         .dark\:border-amber-500\/40:is(.dark *){border-color:rgba(245,158,11,.4)}
         .dark\:border-borderline\/60:is(.dark *){border-color:rgba(30,41,59,.6)}
         .dark\:border-emerald-500\/40:is(.dark *){border-color:rgba(16,185,129,.4)}
@@ -2183,12 +2184,24 @@
             const m = document.getElementById('floor-modal'); if (m) m.classList.add('hidden');
             if (_floorTimer) { clearInterval(_floorTimer); _floorTimer = null; }
         }
+        // Names checked in today (lowercased). Used to mark everyone else OOO.
+        let _floorCheckedIn = null;   // null = attendance unavailable, so don't claim OOO
+
         async function loadFloorStatus() {
             if (!_client || !currentPin) return;
             try {
-                const { data, error } = await _client.rpc('floor_status', { p_pin: currentPin });
-                if (error) return;
-                renderFloorStatus(data || []);
+                const today = _todayLocal();
+                const start = new Date(today + 'T00:00:00');
+                const end = new Date(start.getTime() + 24 * 3600 * 1000);
+                const [fs, att] = await Promise.all([
+                    _client.rpc('floor_status', { p_pin: currentPin }),
+                    _client.rpc('attendance_visible', { p_pin: currentPin, p_from: start.toISOString(), p_to: end.toISOString() })
+                ]);
+                if (fs.error) return;
+                // Only treat attendance as authoritative when the call actually succeeded —
+                // otherwise everyone would wrongly show as out of the office.
+                _floorCheckedIn = att.error ? null : new Set((att.data || []).map(r => _lc(r.agent)));
+                renderFloorStatus(fs.data || []);
             } catch (_) { /* non-fatal */ }
         }
         function renderFloorStatus(rows) {
@@ -2197,16 +2210,31 @@
             const col = n => AV[[...String(n||'A')].reduce((s,c)=>s+c.charCodeAt(0),0) % AV.length];
             const ini = n => (String(n||'A').trim().charAt(0) || 'A').toUpperCase();
             const dur = iso => { const s = Math.max(0,(Date.now()-new Date(iso))/1000); const m = Math.floor(s/60); return m>=60 ? (Math.floor(m/60)+'h '+(m%60)+'m') : (m+'m'); };
-            const away = rows.filter(r => r.aux_type);
+            // Someone who never checked in today is Out Of Office. If the row itself
+            // carries check-in info, trust that first; otherwise fall back to today's
+            // attendance set. When attendance couldn't be loaded, nobody is marked OOO.
+            const isOOO = (r) => {
+                if (r.checked_in === true || r.check_in) return false;
+                if (r.checked_in === false) return true;
+                if (!_floorCheckedIn) return false;
+                return !_floorCheckedIn.has(_lc(r.agent));
+            };
+
+            const away = rows.filter(r => r.aux_type && !isOOO(r));
+            const ooo = rows.filter(isOOO);
             const sum = document.getElementById('floor-summary');
-            if (sum) sum.textContent = away.length + ' on auxiliary · ' + (rows.length - away.length) + ' available';
+            if (sum) sum.textContent = away.length + ' on auxiliary · ' + (rows.length - away.length - ooo.length) + ' available'
+                + (ooo.length ? ' · ' + ooo.length + ' out of office' : '');
             grid.innerHTML = rows.map(r => {
-                const on = !!r.aux_type;
-                const dot = on ? 'bg-amber-500' : 'bg-deepTeal-500';
-                const badge = on
+                const out = isOOO(r);
+                const on = !!r.aux_type && !out;
+                const dot = out ? 'bg-gray-400' : (on ? 'bg-amber-500' : 'bg-deepTeal-500');
+                const badge = out
+                    ? `<span class="text-[10px] font-bold uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-500/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0" title="Not checked in today">OOO</span>`
+                    : on
                     ? `<span class="text-[10px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">${_esc(r.aux_type)} · ${dur(r.since)}</span>`
                     : `<span class="text-[10px] font-bold uppercase tracking-wide text-deepTeal-600 dark:text-deepTeal-400 bg-teal-50 dark:bg-deepTeal-500/10 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">Available</span>`;
-                return `<div class="flex items-center gap-3 bg-gray-50 dark:bg-base rounded-xl p-3 border border-gray-100 dark:border-borderline">
+                return `<div class="flex items-center gap-3 bg-gray-50 dark:bg-base rounded-xl p-3 border border-gray-100 dark:border-borderline${out ? ' opacity-60' : ''}">
                     <div class="relative h-9 w-9 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style="background:${col(r.agent)}">${_esc(ini(r.agent))}<span class="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full ${dot}" style="box-shadow:0 0 0 2px var(--floor-ring,#f9fafb)"></span></div>
                     <div class="min-w-0 flex-grow"><p class="text-xs font-bold text-gray-800 dark:text-gray-100 truncate">${_esc(r.agent)}</p><p class="text-[10px] text-gray-400 truncate">${_esc(r.department || '—')}</p></div>
                     ${badge}
@@ -2489,10 +2517,11 @@
         }
 
         /* ===================== AUX TRACKER ===================== */
-        const AUX_TYPES = ['Restroom', 'Break', 'Away Phone call', 'Away Order', 'Prayer'];
+        const AUX_TYPES = ['Restroom', 'Break', 'Away Phone call', 'Away Order', 'Prayer', 'Cafeteria', 'Floor'];
         const AUX_ICONS = {
             'Restroom': 'fa-restroom', 'Break': 'fa-mug-hot', 'Away Phone call': 'fa-phone',
-            'Away Order': 'fa-cart-shopping', 'Prayer': 'fa-hands-praying'
+            'Away Order': 'fa-cart-shopping', 'Prayer': 'fa-hands-praying',
+            'Cafeteria': 'fa-utensils', 'Floor': 'fa-people-group'
         };
         let auxData = [];          // rows for the selected day
         let _auxTicker = null;     // interval that updates running timers
