@@ -672,6 +672,11 @@
                             <span class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 ml-1">To</span>
                             <input id="auxTo" type="date" class="bg-transparent text-sm outline-none text-gray-700 dark:text-gray-200 font-medium cursor-pointer">
                         </div>
+                        <div class="flex items-center h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline rounded-xl shadow-sm overflow-hidden">
+                            <button data-range="aux" data-span="day" onclick="_setRange('aux','day',loadAux)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors">Today</button>
+                            <button data-range="aux" data-span="week" onclick="_setRange('aux','week',loadAux)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors border-l border-gray-200 dark:border-borderline">7 days</button>
+                            <button data-range="aux" data-span="month" onclick="_setRange('aux','month',loadAux)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors border-l border-gray-200 dark:border-borderline">Month</button>
+                        </div>
                         <select id="auxAgent" onchange="renderAux()" class="h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline px-3 rounded-xl text-sm outline-none text-gray-700 dark:text-gray-200 font-medium shadow-sm focus:ring-2 focus:ring-deepTeal-500/50 cursor-pointer"><option value="">All agents</option></select>
                         <button onclick="exportAuxExcel()" class="h-[44px] text-xs text-green-600 dark:text-green-500 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-green-200"><i class="fa-solid fa-file-excel mr-1.5"></i>Export</button>
                         <button onclick="exportAuxCSV()" class="h-[44px] text-xs text-teal-600 dark:text-teal-400 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-teal-500/30"><i class="fa-solid fa-file-csv mr-1.5"></i>CSV</button>
@@ -728,7 +733,13 @@
                             <span class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 ml-1">To</span>
                             <input id="trnTo" type="date" class="bg-transparent text-sm outline-none text-gray-700 dark:text-gray-200 font-medium cursor-pointer">
                         </div>
+                        <div class="flex items-center h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline rounded-xl shadow-sm overflow-hidden">
+                            <button data-range="trn" data-span="day" onclick="_setRange('trn','day',loadTraining)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors">Today</button>
+                            <button data-range="trn" data-span="week" onclick="_setRange('trn','week',loadTraining)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors border-l border-gray-200 dark:border-borderline">7 days</button>
+                            <button data-range="trn" data-span="month" onclick="_setRange('trn','month',loadTraining)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors border-l border-gray-200 dark:border-borderline">Month</button>
+                        </div>
                         <select id="trnAgent" onchange="renderTraining()" class="h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline px-3 rounded-xl text-sm outline-none text-gray-700 dark:text-gray-200 font-medium shadow-sm focus:ring-2 focus:ring-deepTeal-500/50 cursor-pointer"><option value="">All people</option></select>
+                        <button onclick="exportTrainingExcel()" class="h-[44px] text-xs text-green-600 dark:text-green-500 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-green-200"><i class="fa-solid fa-file-excel mr-1.5"></i>Export</button>
                         <button onclick="exportTrainingCSV()" class="h-[44px] text-xs text-teal-600 dark:text-teal-400 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-teal-500/30"><i class="fa-solid fa-file-csv mr-1.5"></i>CSV</button>
                     </div>
                 </div>
@@ -773,7 +784,13 @@
                             <span class="text-[11px] font-semibold uppercase tracking-wide text-gray-400 ml-1">To</span>
                             <input id="attTo" type="date" class="bg-transparent text-sm outline-none text-gray-700 dark:text-gray-200 font-medium cursor-pointer">
                         </div>
+                        <div class="flex items-center h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline rounded-xl shadow-sm overflow-hidden">
+                            <button data-range="att" data-span="day" onclick="_setRange('att','day',loadAttendance)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors">Today</button>
+                            <button data-range="att" data-span="week" onclick="_setRange('att','week',loadAttendance)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors border-l border-gray-200 dark:border-borderline">7 days</button>
+                            <button data-range="att" data-span="month" onclick="_setRange('att','month',loadAttendance)" class="text-xs font-medium px-3 h-full text-gray-600 dark:text-gray-300 transition-colors border-l border-gray-200 dark:border-borderline">Month</button>
+                        </div>
                         <select id="attAgent" onchange="renderAttendance()" class="h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline px-3 rounded-xl text-sm outline-none text-gray-700 dark:text-gray-200 font-medium shadow-sm focus:ring-2 focus:ring-deepTeal-500/50 cursor-pointer"><option value="">All people</option></select>
+                        <button onclick="exportAttendanceExcel()" class="h-[44px] text-xs text-green-600 dark:text-green-500 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-green-200"><i class="fa-solid fa-file-excel mr-1.5"></i>Export</button>
                         <button onclick="exportAttendanceCSV()" class="h-[44px] text-xs text-teal-600 dark:text-teal-400 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-teal-200 dark:border-teal-500/30"><i class="fa-solid fa-file-csv mr-1.5"></i>CSV</button>
                     </div>
                 </div>
@@ -2869,6 +2886,29 @@
             return f === t ? f : `${f}_to_${t}`;
         }
 
+        // ---- Quick date-range presets ----
+        // The From/To pickers default to today, so pulling any historical report meant
+        // hand-editing both fields. These set the range in one click and reload.
+        // prefix is 'aux' | 'trn' | 'att'; loader is the matching load function.
+        function _setRange(prefix, span, loader) {
+            const d = new Date();
+            const iso = (x) => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+            let from = new Date(d);
+            if (span === 'week') from.setDate(d.getDate() - 6);          // last 7 days incl. today
+            else if (span === 'month') from = new Date(d.getFullYear(), d.getMonth(), 1);
+            document.getElementById(prefix + 'From').value = iso(from);
+            document.getElementById(prefix + 'To').value = iso(d);
+            // Highlight the active preset
+            document.querySelectorAll('[data-range="' + prefix + '"]').forEach(b => {
+                const on = b.dataset.span === span;
+                b.classList.toggle('bg-deepTeal-600', on);
+                b.classList.toggle('text-white', on);
+                b.classList.toggle('text-gray-600', !on);
+                b.classList.toggle('dark:text-gray-300', !on);
+            });
+            loader();
+        }
+
         function exportAuxCSV() {
             if (!auxData.length) { alert('No aux activity to export.'); return; }
             downloadCSV(_buildAuxRows(), `${_exportPrefix()}_AUX_${_auxRangeTag()}.csv`);
@@ -3069,10 +3109,23 @@
             }));
         }
 
+        function _trnRangeTag() {
+            const f = document.getElementById('trnFrom').value, t = document.getElementById('trnTo').value || f;
+            return f === t ? f : `${f}_to_${t}`;
+        }
+
         function exportTrainingCSV() {
             if (!trainingData.length) { alert('No training activity to export.'); return; }
-            const f = document.getElementById('trnFrom').value, t = document.getElementById('trnTo').value || f;
-            downloadCSV(_buildTrainRows(), `${_exportPrefix()}_Training_${f === t ? f : f + '_to_' + t}.csv`);
+            downloadCSV(_buildTrainRows(), `${_exportPrefix()}_Training_${_trnRangeTag()}.csv`);
+        }
+
+        async function exportTrainingExcel() {
+            if (!trainingData.length) { alert('No training activity to export.'); return; }
+            await ensureXLSX();
+            const ws = window.XLSX.utils.json_to_sheet(_buildTrainRows());
+            const wb = window.XLSX.utils.book_new();
+            window.XLSX.utils.book_append_sheet(wb, ws, 'Training');
+            window.XLSX.writeFile(wb, `${_exportPrefix()}_Training_${_trnRangeTag()}.xlsx`);
         }
 
         /* ===================== ATTENDANCE (check in / out) ===================== */
@@ -3278,10 +3331,23 @@
             }));
         }
 
+        function _attRangeTag() {
+            const f = document.getElementById('attFrom').value, t = document.getElementById('attTo').value || f;
+            return f === t ? f : `${f}_to_${t}`;
+        }
+
         function exportAttendanceCSV() {
             if (!attendanceData.length) { alert('No attendance to export.'); return; }
-            const f = document.getElementById('attFrom').value, t = document.getElementById('attTo').value || f;
-            downloadCSV(_buildAttRows(), `${_exportPrefix()}_Attendance_${f === t ? f : f + '_to_' + t}.csv`);
+            downloadCSV(_buildAttRows(), `${_exportPrefix()}_Attendance_${_attRangeTag()}.csv`);
+        }
+
+        async function exportAttendanceExcel() {
+            if (!attendanceData.length) { alert('No attendance to export.'); return; }
+            await ensureXLSX();
+            const ws = window.XLSX.utils.json_to_sheet(_buildAttRows());
+            const wb = window.XLSX.utils.book_new();
+            window.XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+            window.XLSX.writeFile(wb, `${_exportPrefix()}_Attendance_${_attRangeTag()}.xlsx`);
         }
 
         /* ===================== SPIFF VALIDATION ===================== */
