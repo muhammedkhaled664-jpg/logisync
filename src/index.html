@@ -2850,34 +2850,79 @@
             await loadAux();
         }
 
+        // Detail rows: one line per aux session, sorted oldest-first so a day reads
+        // top to bottom. Duration is minutes only — a single numeric column that
+        // Excel can sum, instead of the old readable + seconds pair.
         function _buildAuxRows() {
-            const used = _auxAgentTypeMinutes();
-            return auxData.map(r => {
-                const limit = _auxLimitFor(r.agent, r.aux_type);
-                const dayMin = used[_lc(r.agent) + '||' + r.aux_type] || 0;
-                return {
+            return auxData
+                .slice()
+                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                .map(r => ({
+                    'Date': new Date(r.start_time).toLocaleDateString(),
                     'Agent': r.agent,
                     'Department': memberDept[_lc(r.agent)] || '',
                     'Auxiliary': r.aux_type,
-                    'Date': new Date(r.start_time).toLocaleDateString(),
                     'Start': new Date(r.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     'End': r.end_time ? new Date(r.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'running',
-                    'Duration': _fmtDur(_auxSeconds(r)),
-                    'Duration (seconds)': Math.round(_auxSeconds(r)),
-                    'Daily Limit (min)': limit || '',
-                    'Agent Day Total (min)': Math.round(dayMin),
-                    'Over Limit': (limit > 0 && dayMin > limit) ? 'YES' : '',
-                    'Logged By': r.logged_by || ''
-                };
+                    'Minutes': Math.round(_auxSeconds(r) / 60)
+                }));
+        }
+
+        // Summary rows: one line per agent — total minutes, a column per aux type,
+        // and a flag when any type went over its department limit. This is the sheet
+        // a leader actually reads; the detail sheet is the audit trail behind it.
+        function _buildAuxSummaryRows() {
+            const byAgent = {};
+            auxData.forEach(r => {
+                const key = _lc(r.agent);
+                if (!byAgent[key]) {
+                    byAgent[key] = { agent: r.agent, dept: memberDept[key] || '', total: 0, sessions: 0, types: {} };
+                }
+                const mins = _auxSeconds(r) / 60;
+                byAgent[key].total += mins;
+                byAgent[key].sessions++;
+                byAgent[key].types[r.aux_type] = (byAgent[key].types[r.aux_type] || 0) + mins;
             });
+            return Object.values(byAgent)
+                .sort((a, b) => b.total - a.total)          // busiest first
+                .map(a => {
+                    const row = {
+                        'Agent': a.agent,
+                        'Department': a.dept,
+                        'Sessions': a.sessions,
+                        'Total Minutes': Math.round(a.total)
+                    };
+                    AUX_TYPES.forEach(t => { row[t + ' (min)'] = Math.round(a.types[t] || 0); });
+                    const over = AUX_TYPES.filter(t => {
+                        const lim = _auxLimitFor(a.agent, t);
+                        return lim > 0 && (a.types[t] || 0) > lim;
+                    });
+                    row['Over Limit'] = over.length ? over.join(', ') : '';
+                    return row;
+                });
+        }
+
+        // Sets sensible column widths so nothing shows as ##### or a squashed column.
+        function _autoFitCols(ws, rows) {
+            if (!rows.length) return;
+            ws['!cols'] = Object.keys(rows[0]).map(k => ({
+                wch: Math.min(40, Math.max(k.length + 2, ...rows.map(r => String(r[k] ?? '').length + 2)))
+            }));
         }
 
         async function exportAuxExcel() {
             if (!auxData.length) { alert('No aux activity to export.'); return; }
             await ensureXLSX();
-            const ws = window.XLSX.utils.json_to_sheet(_buildAuxRows());
             const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, ws, 'AUX');
+            // Summary first — it's what gets read; Detail is the backing audit trail.
+            const summary = _buildAuxSummaryRows();
+            const detail = _buildAuxRows();
+            const wsS = window.XLSX.utils.json_to_sheet(summary);
+            _autoFitCols(wsS, summary);
+            window.XLSX.utils.book_append_sheet(wb, wsS, 'Summary');
+            const wsD = window.XLSX.utils.json_to_sheet(detail);
+            _autoFitCols(wsD, detail);
+            window.XLSX.utils.book_append_sheet(wb, wsD, 'Detail');
             window.XLSX.writeFile(wb, `${_exportPrefix()}_AUX_${_auxRangeTag()}.xlsx`);
         }
 
@@ -3097,16 +3142,17 @@
         }
 
         function _buildTrainRows() {
-            return trainingData.map(r => ({
-                'Person': r.agent,
-                'Topic': r.topic,
-                'Date': new Date(r.start_time).toLocaleDateString(),
-                'Start': new Date(r.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                'End': r.end_time ? new Date(r.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'running',
-                'Duration': _fmtDur(_auxSeconds(r)),
-                'Duration (minutes)': Math.round(_auxSeconds(r) / 60),
-                'Logged By': r.logged_by || ''
-            }));
+            return trainingData
+                .slice()
+                .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
+                .map(r => ({
+                    'Date': new Date(r.start_time).toLocaleDateString(),
+                    'Person': r.agent,
+                    'Topic': r.topic,
+                    'Start': new Date(r.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    'End': r.end_time ? new Date(r.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'running',
+                    'Minutes': Math.round(_auxSeconds(r) / 60)
+                }));
         }
 
         function _trnRangeTag() {
@@ -3119,12 +3165,37 @@
             downloadCSV(_buildTrainRows(), `${_exportPrefix()}_Training_${_trnRangeTag()}.csv`);
         }
 
+        function _buildTrainSummaryRows() {
+            const byPerson = {};
+            trainingData.forEach(r => {
+                const key = _lc(r.agent);
+                if (!byPerson[key]) byPerson[key] = { person: r.agent, mins: 0, sessions: 0, topics: new Set() };
+                byPerson[key].mins += _auxSeconds(r) / 60;
+                byPerson[key].sessions++;
+                if (r.topic) byPerson[key].topics.add(r.topic);
+            });
+            return Object.values(byPerson)
+                .sort((a, b) => b.mins - a.mins)
+                .map(p => ({
+                    'Person': p.person,
+                    'Sessions': p.sessions,
+                    'Total Minutes': Math.round(p.mins),
+                    'Topics Covered': [...p.topics].join(', ')
+                }));
+        }
+
         async function exportTrainingExcel() {
             if (!trainingData.length) { alert('No training activity to export.'); return; }
             await ensureXLSX();
-            const ws = window.XLSX.utils.json_to_sheet(_buildTrainRows());
             const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, ws, 'Training');
+            const summary = _buildTrainSummaryRows();
+            const detail = _buildTrainRows();
+            const wsS = window.XLSX.utils.json_to_sheet(summary);
+            _autoFitCols(wsS, summary);
+            window.XLSX.utils.book_append_sheet(wb, wsS, 'Summary');
+            const wsD = window.XLSX.utils.json_to_sheet(detail);
+            _autoFitCols(wsD, detail);
+            window.XLSX.utils.book_append_sheet(wb, wsD, 'Detail');
             window.XLSX.writeFile(wb, `${_exportPrefix()}_Training_${_trnRangeTag()}.xlsx`);
         }
 
@@ -3319,16 +3390,38 @@
         }
 
         function _buildAttRows() {
-            return attendanceData.map(r => ({
-                'Person': r.agent,
-                'Date': new Date(r.check_in).toLocaleDateString(),
-                'Check in': new Date(r.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                'Check out': r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'active',
-                'Duration': _fmtDur(_attSeconds(r)),
-                'Duration (minutes)': Math.round(_attSeconds(r) / 60),
-                'Device': r.device || '',
-                'Logged By': r.logged_by || ''
-            }));
+            return attendanceData
+                .slice()
+                .sort((a, b) => new Date(a.check_in) - new Date(b.check_in))
+                .map(r => ({
+                    'Date': new Date(r.check_in).toLocaleDateString(),
+                    'Person': r.agent,
+                    'Check in': new Date(r.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    'Check out': r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'active',
+                    'Hours': Math.round(_attSeconds(r) / 360) / 10,   // 1 decimal place
+                    'Device': r.device || ''
+                }));
+        }
+
+        // Per-person totals: days present and total hours — the actual check-in report.
+        function _buildAttSummaryRows() {
+            const byPerson = {};
+            attendanceData.forEach(r => {
+                const key = _lc(r.agent);
+                if (!byPerson[key]) byPerson[key] = { person: r.agent, secs: 0, shifts: 0, days: new Set() };
+                byPerson[key].secs += _attSeconds(r);
+                byPerson[key].shifts++;
+                byPerson[key].days.add(new Date(r.check_in).toDateString());
+            });
+            return Object.values(byPerson)
+                .sort((a, b) => b.secs - a.secs)
+                .map(p => ({
+                    'Person': p.person,
+                    'Days Present': p.days.size,
+                    'Shifts': p.shifts,
+                    'Total Hours': Math.round(p.secs / 360) / 10,
+                    'Avg Hours / Day': p.days.size ? Math.round(p.secs / p.days.size / 360) / 10 : 0
+                }));
         }
 
         function _attRangeTag() {
@@ -3344,9 +3437,15 @@
         async function exportAttendanceExcel() {
             if (!attendanceData.length) { alert('No attendance to export.'); return; }
             await ensureXLSX();
-            const ws = window.XLSX.utils.json_to_sheet(_buildAttRows());
             const wb = window.XLSX.utils.book_new();
-            window.XLSX.utils.book_append_sheet(wb, ws, 'Attendance');
+            const summary = _buildAttSummaryRows();
+            const detail = _buildAttRows();
+            const wsS = window.XLSX.utils.json_to_sheet(summary);
+            _autoFitCols(wsS, summary);
+            window.XLSX.utils.book_append_sheet(wb, wsS, 'Summary');
+            const wsD = window.XLSX.utils.json_to_sheet(detail);
+            _autoFitCols(wsD, detail);
+            window.XLSX.utils.book_append_sheet(wb, wsD, 'Detail');
             window.XLSX.writeFile(wb, `${_exportPrefix()}_Attendance_${_attRangeTag()}.xlsx`);
         }
 
