@@ -2184,24 +2184,12 @@
             const m = document.getElementById('floor-modal'); if (m) m.classList.add('hidden');
             if (_floorTimer) { clearInterval(_floorTimer); _floorTimer = null; }
         }
-        // Names checked in today (lowercased). Used to mark everyone else OOO.
-        let _floorCheckedIn = null;   // null = attendance unavailable, so don't claim OOO
-
         async function loadFloorStatus() {
             if (!_client || !currentPin) return;
             try {
-                const today = _todayLocal();
-                const start = new Date(today + 'T00:00:00');
-                const end = new Date(start.getTime() + 24 * 3600 * 1000);
-                const [fs, att] = await Promise.all([
-                    _client.rpc('floor_status', { p_pin: currentPin }),
-                    _client.rpc('attendance_visible', { p_pin: currentPin, p_from: start.toISOString(), p_to: end.toISOString() })
-                ]);
-                if (fs.error) return;
-                // Only treat attendance as authoritative when the call actually succeeded —
-                // otherwise everyone would wrongly show as out of the office.
-                _floorCheckedIn = att.error ? null : new Set((att.data || []).map(r => _lc(r.agent)));
-                renderFloorStatus(fs.data || []);
+                const { data, error } = await _client.rpc('floor_status', { p_pin: currentPin });
+                if (error) return;
+                renderFloorStatus(data || []);
             } catch (_) { /* non-fatal */ }
         }
         function renderFloorStatus(rows) {
@@ -2211,16 +2199,19 @@
             const ini = n => (String(n||'A').trim().charAt(0) || 'A').toUpperCase();
             const dur = iso => { const s = Math.max(0,(Date.now()-new Date(iso))/1000); const m = Math.floor(s/60); return m>=60 ? (Math.floor(m/60)+'h '+(m%60)+'m') : (m+'m'); };
             // Someone who never checked in today is Out Of Office.
-            // Being on an aux is proof they are here, so an active aux always wins
-            // over OOO — never hide a live break behind an "out of office" badge.
-            // If the row carries its own check-in info, trust that; otherwise fall
-            // back to today's attendance. If attendance is unavailable, nobody is OOO.
+            // An active aux is proof the person is present, so it always wins over OOO.
+            //
+            // IMPORTANT: this must only use check-in data that covers the WHOLE floor.
+            // attendance_visible is role-scoped (an agent sees only their own rows, a
+            // manager only their department), while floor_status lists everyone — joining
+            // those two client-side marked everyone outside the caller's scope as OOO
+            // even when they had checked in. So we rely solely on a check-in field
+            // supplied by floor_status itself, and show no OOO badge when it is absent.
             const isOOO = (r) => {
                 if (r.aux_type) return false;
                 if (r.checked_in === true || r.check_in) return false;
                 if (r.checked_in === false) return true;
-                if (!_floorCheckedIn) return false;
-                return !_floorCheckedIn.has(_lc(r.agent));
+                return false;
             };
 
             const away = rows.filter(r => r.aux_type);
