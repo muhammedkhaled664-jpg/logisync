@@ -11,12 +11,20 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Warm up the CDN connections we know we'll need, in parallel with parsing. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Fonts must not block first paint on a phone: load async, and only apply
+         once ready (system font shows meanwhile via the family fallback). -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" onload="this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"></noscript>
     <link rel="stylesheet" href="tailwind.build.css">
-    <!-- Pinned to the exact version the app is built against so a future
-         Chart.js release can't silently change/break production. -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
+    <!-- Must NOT be deferred: the main inline script calls supabase.createClient()
+         during parse, so the library has to be present by then. -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- Chart.js is only used after login (dashboard doughnut + overview charts),
+         so it must not block first paint. Pinned to the built-against version. -->
+    <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1"></script>
     <!-- SheetJS is loaded on demand (export/import) to keep first load fast -->
     <script>
         let _xlsxP;
@@ -30,8 +38,12 @@
             return _xlsxP;
         }
     </script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    <!-- Per-client configuration (branding, agents, categories, Supabase keys) -->
+    <!-- Icons are decorative for first paint — load async so a slow CDN can't
+         hold the page blank on mobile data. -->
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" onload="this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"></noscript>
+    <!-- Per-client configuration (branding, agents, categories, Supabase keys).
+         Must stay synchronous: the inline script below reads CLIENT_CONFIG. -->
     <script src="config.js"></script>
     <style>
         body { transition: background-color 0.3s, color 0.3s; overflow-x: hidden; padding-bottom: 80px; }
@@ -326,11 +338,13 @@
 </head>
 <body class="font-sans antialiased min-h-screen flex flex-col items-center bg-gray-50 text-gray-800 dark:bg-base dark:text-gray-200 selection:bg-deepTeal-500 selection:text-white">
     
-    <div id="splash"><img src="logo.png" data-brand-logo alt="Loading"><div class="bar"></div></div>
+    <!-- Uses the 6KB SVG rather than the 149KB PNG: this is the very first paint
+         on a phone, and the PNG was being fetched before anything rendered. -->
+    <div id="splash"><img src="logo.svg" data-brand-logo alt="Loading" width="90" height="90"><div class="bar"></div></div>
     <div id="toast-wrap"></div>
 
     <div id="login-screen" class="bg-white dark:bg-panel p-10 rounded-2xl shadow-xl border border-gray-200 dark:border-borderline text-center max-w-sm w-full mt-24 transition-colors">
-        <img src="logo.png" data-brand-logo alt="Logo" class="mx-auto mb-6 h-24 object-contain">
+        <img src="logo.svg" data-brand-logo alt="Logo" width="96" height="96" class="mx-auto mb-6 h-24 object-contain">
         <h1 data-brand-name class="text-3xl font-extrabold text-gray-800 dark:text-white tracking-tighter mb-1">LogiSync</h1>
         <p data-brand-tagline class="text-xs text-gray-500 dark:text-gray-400 mb-6 font-medium uppercase tracking-widest">Operations Authentication</p>
         
@@ -344,7 +358,7 @@
     <div id="main-app" class="max-w-7xl w-full mx-auto px-4 md:px-8 pb-24 mt-4 flex-grow flex-col hidden">
         <header class="w-full flex flex-col md:flex-row justify-between items-center py-4 border-b border-gray-200 dark:border-borderline mb-6 transition-colors">
             <div class="flex items-center gap-3">
-                <span class="brand-mark"><img src="logo.png" data-brand-logo alt="Logo"></span>
+                <span class="brand-mark"><img src="logo.svg" data-brand-logo alt="Logo" width="38" height="38"></span>
                 <div class="hidden md:flex flex-col leading-none">
                     <h1 data-brand-name class="text-xl font-black text-gray-800 dark:text-white tracking-tighter">LogiSync</h1>
                     <span class="text-[10px] uppercase tracking-[0.18em] text-gray-400 dark:text-gray-500 font-semibold mt-0.5">Operations Console <span id="buildTag" class="normal-case tracking-normal text-deepTeal-500"></span></span>
@@ -2100,14 +2114,20 @@
            So every day boundary is resolved in ONE configured zone.
            Durations are unaffected — those subtract server-generated timestamps.
            ===================================================================== */
-        const BIZ_TZ = (CFG && CFG.timezone) || 'America/New_York';
+        // Resolved lazily on each use rather than captured once at parse time, so it
+        // can't get frozen to a fallback if config.js hasn't executed yet (script
+        // ordering, a cached/partial load, or a client embedding this page differently).
+        function _bizTz() {
+            const tz = (window.CLIENT_CONFIG && window.CLIENT_CONFIG.timezone) || (typeof CFG !== 'undefined' && CFG.timezone);
+            return tz || 'America/New_York';
+        }
 
         // Calendar date (YYYY-MM-DD) of a moment, in the business timezone.
         // 'en-CA' formats as YYYY-MM-DD, which is exactly what date inputs want.
         function _bizDate(d) {
             try {
                 return new Intl.DateTimeFormat('en-CA', {
-                    timeZone: BIZ_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
+                    timeZone: _bizTz(), year: 'numeric', month: '2-digit', day: '2-digit'
                 }).format(d || new Date());
             } catch (_) {
                 // Bad/unsupported zone name — fall back to device local rather than break.
@@ -2121,7 +2141,7 @@
         function _bizOffsetMinutes(d) {
             try {
                 const parts = new Intl.DateTimeFormat('en-US', {
-                    timeZone: BIZ_TZ, hour12: false,
+                    timeZone: _bizTz(), hour12: false,
                     year: 'numeric', month: '2-digit', day: '2-digit',
                     hour: '2-digit', minute: '2-digit', second: '2-digit'
                 }).formatToParts(d);
@@ -2165,13 +2185,13 @@
         function _bizTime(iso) {
             if (!iso) return '—';
             try {
-                return new Intl.DateTimeFormat([], { timeZone: BIZ_TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+                return new Intl.DateTimeFormat([], { timeZone: _bizTz(), hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
             } catch (_) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
         }
         function _bizDateDisplay(iso) {
             if (!iso) return '';
             try {
-                return new Intl.DateTimeFormat([], { timeZone: BIZ_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+                return new Intl.DateTimeFormat([], { timeZone: _bizTz(), year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
             } catch (_) { return new Date(iso).toLocaleDateString(); }
         }
 
@@ -2273,7 +2293,9 @@
             m.classList.remove('hidden');
             await loadFloorStatus();
             if (_floorTimer) clearInterval(_floorTimer);
-            _floorTimer = setInterval(loadFloorStatus, 8000);
+            // Skip polling while the tab is hidden / phone is locked — otherwise this
+            // kept firing every 8s in the background, draining battery and data.
+            _floorTimer = setInterval(() => { if (!document.hidden) loadFloorStatus(); }, 8000);
         }
         function closeFloorStatus() {
             const m = document.getElementById('floor-modal'); if (m) m.classList.add('hidden');
