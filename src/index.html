@@ -2091,11 +2091,89 @@
             setTimeout(() => URL.revokeObjectURL(url), 1000);
         }
         const _exportPrefix = () => (CFG.exportPrefix || CFG.brandName || 'Ops').replace(/\s+/g, '_');
-        // Local calendar date as YYYY-MM-DD. Using toISOString() here would give the
-        // UTC date, which rolls to "tomorrow" during the evening in western timezones —
-        // that silently broke the Aux/Training/Attendance "today" defaults & live boards.
-        function _todayLocal() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+        /* =====================================================================
+           BUSINESS TIMEZONE
+           The floor runs a US Eastern campaign day while staff devices sit in
+           other zones (phones on Africa/Cairo, PCs on Eastern). If "today" came
+           from each device's clock, the same shift would be filed under two
+           different dates and daily totals/OOO would disagree per device.
+           So every day boundary is resolved in ONE configured zone.
+           Durations are unaffected — those subtract server-generated timestamps.
+           ===================================================================== */
+        const BIZ_TZ = (CFG && CFG.timezone) || 'America/New_York';
+
+        // Calendar date (YYYY-MM-DD) of a moment, in the business timezone.
+        // 'en-CA' formats as YYYY-MM-DD, which is exactly what date inputs want.
+        function _bizDate(d) {
+            try {
+                return new Intl.DateTimeFormat('en-CA', {
+                    timeZone: BIZ_TZ, year: 'numeric', month: '2-digit', day: '2-digit'
+                }).format(d || new Date());
+            } catch (_) {
+                // Bad/unsupported zone name — fall back to device local rather than break.
+                const x = d || new Date();
+                return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+            }
+        }
+
+        // Business-timezone offset (minutes) at a given moment. Derived from the
+        // zone itself, so it follows DST automatically instead of hardcoding -5/-4.
+        function _bizOffsetMinutes(d) {
+            try {
+                const parts = new Intl.DateTimeFormat('en-US', {
+                    timeZone: BIZ_TZ, hour12: false,
+                    year: 'numeric', month: '2-digit', day: '2-digit',
+                    hour: '2-digit', minute: '2-digit', second: '2-digit'
+                }).formatToParts(d);
+                const g = t => Number(parts.find(p => p.type === t).value);
+                // What the wall clock reads in the business zone, treated as UTC…
+                const asUTC = Date.UTC(g('year'), g('month') - 1, g('day'), g('hour') % 24, g('minute'), g('second'));
+                // …minus the real instant gives the zone's offset.
+                return Math.round((asUTC - d.getTime()) / 60000);
+            } catch (_) { return -d.getTimezoneOffset(); }
+        }
+
+        // Exact UTC instant of local midnight (start of `dateStr`) in the business zone.
+        // Two-pass so it stays correct across a DST change on that date.
+        function _bizDayStart(dateStr) {
+            const [y, m, dd] = dateStr.split('-').map(Number);
+            const guess = new Date(Date.UTC(y, m - 1, dd, 0, 0, 0));
+            let inst = new Date(guess.getTime() - _bizOffsetMinutes(guess) * 60000);
+            inst = new Date(guess.getTime() - _bizOffsetMinutes(inst) * 60000);
+            return inst;
+        }
+
+        // Half-open UTC range [from, to) covering the business days fromStr..toStr.
+        function _bizRange(fromStr, toStr) {
+            const start = _bizDayStart(fromStr);
+            const [y, m, dd] = (toStr || fromStr).split('-').map(Number);
+            const nextDay = new Date(Date.UTC(y, m - 1, dd));
+            nextDay.setUTCDate(nextDay.getUTCDate() + 1);
+            const end = _bizDayStart(_isoUTCDate(nextDay));
+            return { start, end };
+        }
+        function _isoUTCDate(d) {
+            return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+        }
+
+        // "Today" everywhere in the app means today in the business timezone.
+        function _todayLocal() { return _bizDate(new Date()); }
         const _stamp = () => _todayLocal();
+
+        // Clock time / date of a logged event, rendered in the business timezone so a
+        // shift reads identically on an Eastern PC and an Egyptian phone.
+        function _bizTime(iso) {
+            if (!iso) return '—';
+            try {
+                return new Intl.DateTimeFormat([], { timeZone: BIZ_TZ, hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+            } catch (_) { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+        }
+        function _bizDateDisplay(iso) {
+            if (!iso) return '';
+            try {
+                return new Intl.DateTimeFormat([], { timeZone: BIZ_TZ, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(iso));
+            } catch (_) { return new Date(iso).toLocaleDateString(); }
+        }
 
         async function _buildTaskRows() {
             const { data, error } = await _client.rpc('tasks_visible', { p_pin: currentPin }).order('created_at', { ascending: false });
@@ -2642,8 +2720,7 @@
             let to = document.getElementById('auxTo').value;
             if (!from) return;
             if (!to || to < from) to = from;
-            const start = new Date(from + 'T00:00:00');
-            const end = new Date(new Date(to + 'T00:00:00').getTime() + 24 * 3600 * 1000);
+            const { start, end } = _bizRange(from, to);   // business-day boundaries, not device-local
             const [logs, lim] = await Promise.all([
                 _client.rpc('aux_visible', { p_pin: currentPin, p_from: start.toISOString(), p_to: end.toISOString() }),
                 _client.from('department_aux_limits').select('*')
@@ -2786,7 +2863,7 @@
                 body.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">No auxiliary activity for this selection.</td></tr>`;
                 return;
             }
-            const tfmt = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+            const tfmt = (iso) => _bizTime(iso);
             body.innerHTML = viewRows.map(r => `<tr class="border-b border-gray-100 dark:border-borderline/60">
                 <td class="py-2.5 px-4 font-medium text-gray-800 dark:text-gray-100">${_esc(r.agent)}</td>
                 <td class="py-2.5 px-3 text-gray-600 dark:text-gray-300"><i class="fa-solid ${AUX_ICONS[r.aux_type] || 'fa-stopwatch'} mr-1.5 text-deepTeal-500"></i>${_esc(r.aux_type)}</td>
@@ -2858,12 +2935,12 @@
                 .slice()
                 .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
                 .map(r => ({
-                    'Date': new Date(r.start_time).toLocaleDateString(),
+                    'Date': _bizDateDisplay(r.start_time),
                     'Agent': r.agent,
                     'Department': memberDept[_lc(r.agent)] || '',
                     'Auxiliary': r.aux_type,
-                    'Start': new Date(r.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    'End': r.end_time ? new Date(r.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'running',
+                    'Start': _bizTime(r.start_time),
+                    'End': r.end_time ? _bizTime(r.end_time) : 'running',
                     'Minutes': Math.round(_auxSeconds(r) / 60)
                 }));
         }
@@ -3018,8 +3095,7 @@
             let to = document.getElementById('trnTo').value;
             if (!from) return;
             if (!to || to < from) to = from;
-            const start = new Date(from + 'T00:00:00');
-            const end = new Date(new Date(to + 'T00:00:00').getTime() + 24 * 3600 * 1000);
+            const { start, end } = _bizRange(from, to);   // business-day boundaries, not device-local
             const { data, error } = await _client.rpc('training_visible', { p_pin: currentPin, p_from: start.toISOString(), p_to: end.toISOString() });
             if (error) { connectionToast('Could not load training logs.'); trainingData = []; }
             else trainingData = data || [];   // scoped server-side
@@ -3087,7 +3163,7 @@
                 body.innerHTML = `<tr><td colspan="6" class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">No training logged for this selection.</td></tr>`;
                 return;
             }
-            const tfmt = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+            const tfmt = (iso) => _bizTime(iso);
             body.innerHTML = viewRows.map(r => `<tr class="border-b border-gray-100 dark:border-borderline/60">
                 <td class="py-2.5 px-4 font-medium text-gray-800 dark:text-gray-100">${_esc(r.agent)}</td>
                 <td class="py-2.5 px-3 text-gray-600 dark:text-gray-300"><i class="fa-solid fa-graduation-cap mr-1.5 text-deepTeal-500"></i>${_esc(r.topic)}</td>
@@ -3146,11 +3222,11 @@
                 .slice()
                 .sort((a, b) => new Date(a.start_time) - new Date(b.start_time))
                 .map(r => ({
-                    'Date': new Date(r.start_time).toLocaleDateString(),
+                    'Date': _bizDateDisplay(r.start_time),
                     'Person': r.agent,
                     'Topic': r.topic,
-                    'Start': new Date(r.start_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    'End': r.end_time ? new Date(r.end_time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'running',
+                    'Start': _bizTime(r.start_time),
+                    'End': r.end_time ? _bizTime(r.end_time) : 'running',
                     'Minutes': Math.round(_auxSeconds(r) / 60)
                 }));
         }
@@ -3259,8 +3335,7 @@
             let to = document.getElementById('attTo').value;
             if (!from) return;
             if (!to || to < from) to = from;
-            const start = new Date(from + 'T00:00:00');
-            const end = new Date(new Date(to + 'T00:00:00').getTime() + 24 * 3600 * 1000);
+            const { start, end } = _bizRange(from, to);   // business-day boundaries, not device-local
             const { data, error } = await _client.rpc('attendance_visible', { p_pin: currentPin, p_from: start.toISOString(), p_to: end.toISOString() });
             if (error) { connectionToast('Could not load attendance.'); attendanceData = []; }
             else attendanceData = data || [];   // scoped server-side
@@ -3285,7 +3360,7 @@
             const pick = document.getElementById('attAgent') ? document.getElementById('attAgent').value : '';
             const inPick = (name) => !pick || _lc(name) === _lc(pick);
             const viewRows = attendanceData.filter(r => inPick(r.agent));
-            const tfmt = (iso) => iso ? new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
+            const tfmt = (iso) => _bizTime(iso);
 
             // Per-person summary
             const sumBox = document.getElementById('att-agent-summary');
@@ -3394,10 +3469,10 @@
                 .slice()
                 .sort((a, b) => new Date(a.check_in) - new Date(b.check_in))
                 .map(r => ({
-                    'Date': new Date(r.check_in).toLocaleDateString(),
+                    'Date': _bizDateDisplay(r.check_in),
                     'Person': r.agent,
-                    'Check in': new Date(r.check_in).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    'Check out': r.check_out ? new Date(r.check_out).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'active',
+                    'Check in': _bizTime(r.check_in),
+                    'Check out': r.check_out ? _bizTime(r.check_out) : 'active',
                     'Hours': Math.round(_attSeconds(r) / 360) / 10,   // 1 decimal place
                     'Device': r.device || ''
                 }));
