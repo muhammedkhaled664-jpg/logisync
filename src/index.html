@@ -120,6 +120,13 @@
         #login-screen { position:relative; z-index:1; }
         #login-screen::before { content:""; position:absolute; inset:-50px; z-index:-1; background:radial-gradient(circle at 50% 0%, rgba(20,184,166,.20), transparent 68%); pointer-events:none; }
         #login-screen img { filter: drop-shadow(0 8px 20px rgba(20,184,166,.25)); }
+        /* Phones: drop the expensive decorative effects on the login screen. The
+           on-screen keyboard resizes the viewport on every focus, and repainting a
+           radial glow plus a drop-shadow filter made typing feel laggy. */
+        @media (max-width:768px){
+          #login-screen::before { display:none; }
+          #login-screen img { filter:none; }
+        }
 
         /* ===== Premium: depth, hero & header ===== */
         .lift { transition: transform .2s ease, box-shadow .2s ease; }
@@ -164,17 +171,24 @@
         html{ -webkit-text-size-adjust:100%; }
         body{
           font-feature-settings:"cv02","cv03","cv11"; letter-spacing:-.006em;
-          -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+          -webkit-font-smoothing:antialiased;
+          background:#f5f7fa;
+        }
+        /* The two decorative radial washes live on a fixed, GPU-composited layer
+           instead of on <body>. On phones the keyboard opening resizes the
+           viewport, and repainting ~1200px gradients on body made typing lag. */
+        body::before{
+          content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
           background:
             radial-gradient(1200px 560px at 88% -10%, rgba(20,184,166,.07), transparent 60%),
-            radial-gradient(900px 500px at -10% 8%, rgba(56,189,248,.05), transparent 55%),
-            #f5f7fa;
+            radial-gradient(900px 500px at -10% 8%, rgba(56,189,248,.05), transparent 55%);
+          will-change:transform;
         }
-        .dark body{
+        .dark body{ background:#0a0f1c; }
+        .dark body::before{
           background:
             radial-gradient(1200px 560px at 88% -10%, rgba(20,184,166,.12), transparent 60%),
-            radial-gradient(900px 500px at -10% 8%, rgba(56,189,248,.07), transparent 55%),
-            #0a0f1c;
+            radial-gradient(900px 500px at -10% 8%, rgba(56,189,248,.07), transparent 55%);
         }
         /* Confident headings */
         h1,h2,h3{ letter-spacing:-.022em; }
