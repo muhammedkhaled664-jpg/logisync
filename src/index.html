@@ -519,6 +519,7 @@
                     <button onclick="openTraining()" id="tabTraining" class="tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-graduation-cap w-4"></i> Training</button>
                     <button onclick="openAttendance()" id="tabAttendance" class="tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-clock-rotate-left w-4"></i> Attendance</button>
                     <button onclick="openSpiff()" id="tabSpiff" class="tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-clipboard-check w-4"></i> Spiff Validation</button>
+                    <button onclick="openAudit()" id="tabAudit" class="hidden tab-btn-side flex items-center gap-3 text-gray-600 dark:text-gray-400 hover:bg-white dark:hover:bg-panel text-left py-2.5 px-3 rounded-lg font-medium text-sm transition-all border border-transparent"><i class="fa-solid fa-clipboard-list w-4"></i> Audit Log</button>
                     <div class="mt-6 pt-6 border-t border-gray-200 dark:border-borderline">
                         <!-- Admin is the one everyday action, so it stays visible; the rest
                              collapse into Tools to keep the sidebar from becoming a wall. -->
@@ -906,6 +907,46 @@
                     </table>
                 </div>
             </div>
+
+            <!-- ===================== AUDIT LOG (leaders only) ===================== -->
+            <div id="audit-view" class="hidden">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5 border-b border-gray-200 dark:border-borderline pb-4">
+                    <div class="flex items-center gap-3">
+                        <button onclick="goBoard()" class="h-[40px] px-3 rounded-xl bg-white dark:bg-panel border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 text-sm font-medium shadow-sm hover:bg-gray-50 dark:hover:bg-base transition-colors"><i class="fa-solid fa-arrow-left mr-1.5"></i>Back</button>
+                        <div>
+                            <h2 class="text-lg font-black text-gray-800 dark:text-white tracking-tight"><i class="fa-solid fa-clipboard-list text-deepTeal-500 mr-2"></i>Audit Log</h2>
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Every change made in the app — who, what, and the values before and after.</p>
+                        </div>
+                    </div>
+                    <div class="flex flex-wrap items-center gap-2">
+                        <select id="auditTable" onchange="loadAudit()" class="h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline px-3 rounded-xl text-sm outline-none text-gray-700 dark:text-gray-200 font-medium shadow-sm cursor-pointer"><option value="">All activity</option></select>
+                        <select id="auditLimit" onchange="loadAudit()" class="h-[44px] bg-white dark:bg-panel border border-gray-200 dark:border-borderline px-3 rounded-xl text-sm outline-none text-gray-700 dark:text-gray-200 font-medium shadow-sm cursor-pointer">
+                            <option value="100">Last 100</option>
+                            <option value="250" selected>Last 250</option>
+                            <option value="1000">Last 1000</option>
+                        </select>
+                        <button onclick="loadAudit()" class="h-[44px] text-xs text-gray-600 dark:text-gray-300 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-gray-200 dark:border-borderline"><i class="fa-solid fa-rotate mr-1.5"></i>Refresh</button>
+                        <button onclick="exportAuditExcel()" class="h-[44px] text-xs text-green-600 dark:text-green-500 font-medium px-3 rounded-xl bg-white dark:bg-panel shadow-sm border border-green-200"><i class="fa-solid fa-file-excel mr-1.5"></i>Export</button>
+                    </div>
+                </div>
+
+                <div id="audit-summary" class="mb-4"></div>
+
+                <div class="overflow-x-auto bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm">
+                    <table class="w-full text-sm min-w-[720px]">
+                        <thead>
+                            <tr class="text-left text-[11px] uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-borderline">
+                                <th class="py-3 px-4 font-semibold">When</th>
+                                <th class="py-3 px-3 font-semibold">Who</th>
+                                <th class="py-3 px-3 font-semibold">Action</th>
+                                <th class="py-3 px-3 font-semibold">Where</th>
+                                <th class="py-3 px-3 font-semibold">What changed</th>
+                            </tr>
+                        </thead>
+                        <tbody id="audit-body"></tbody>
+                    </table>
+                </div>
+            </div>
         </main>
 
         <!-- Spiff teams editor modal -->
@@ -1040,6 +1081,7 @@
         <button id="mTabAttendance" onclick="openAttendance();closeReportsMenu()" class="text-left text-sm px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-base"><i class="fa-solid fa-clock-rotate-left w-5 text-deepTeal-500"></i> Attendance</button>
         <button id="mTabSpiff" onclick="openSpiff();closeReportsMenu()" class="text-left text-sm px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-base"><i class="fa-solid fa-clipboard-check w-5 text-deepTeal-500"></i> Spiff Validation</button>
         <button onclick="openFloorStatus();closeReportsMenu()" class="text-left text-sm px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-base"><i class="fa-solid fa-users-viewfinder w-5 text-deepTeal-500"></i> Floor Status</button>
+        <button id="mTabAudit" onclick="openAudit();closeReportsMenu()" class="hidden text-left text-sm px-3 py-2.5 rounded-lg text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-base"><i class="fa-solid fa-clipboard-list w-5 text-deepTeal-500"></i> Audit Log</button>
         <button id="leadershipBtn" onclick="openLeadership();closeReportsMenu()" class="hidden text-left text-sm px-3 py-2.5 rounded-lg text-white bg-gradient-to-r from-deepTeal-600 to-deepTeal-500 hover:from-deepTeal-500 hover:to-deepTeal-400 mt-1 font-semibold shadow-sm"><i class="fa-solid fa-tv w-5"></i> Leadership Mode</button>
     </div>
 
@@ -1352,6 +1394,8 @@
                     document.getElementById('manageNamesBtn').classList.remove('hidden');
                     document.getElementById('sweepStaleBtn').classList.remove('hidden');
                     document.getElementById('importTasksBtn').classList.remove('hidden');
+                    document.getElementById('tabAudit').classList.remove('hidden');
+                    document.getElementById('mTabAudit').classList.remove('hidden');
                 } else {
                     document.getElementById('mobile-leader-controls').classList.add('hidden');
                     document.getElementById('eodBtn').classList.add('hidden');
@@ -1365,6 +1409,8 @@
                     document.getElementById('manageNamesBtn').classList.add('hidden');
                     document.getElementById('sweepStaleBtn').classList.add('hidden');
                     document.getElementById('importTasksBtn').classList.add('hidden');
+                    document.getElementById('tabAudit').classList.add('hidden');
+                    document.getElementById('mTabAudit').classList.add('hidden');
                 }
 
                 updateBadge();
@@ -2282,6 +2328,7 @@
             document.getElementById('training-view').classList.add('hidden');
             document.getElementById('attendance-view').classList.add('hidden');
             document.getElementById('spiff-view').classList.add('hidden');
+            document.getElementById('audit-view').classList.add('hidden');
             _stopAuxTicker();
             _stopTrainTicker();
             _stopAttTicker();
@@ -2412,6 +2459,9 @@
             document.getElementById('stats-panel').classList.add('hidden');
             document.getElementById('input-zone').classList.add('hidden');
             document.getElementById('board-area').classList.add('hidden');
+            // Every report screen routes through here, so hiding the audit view in
+            // this one place covers all of them. openAudit() re-shows it afterwards.
+            document.getElementById('audit-view').classList.add('hidden');
             document.querySelectorAll('.tab-btn-side').forEach(b => { b.classList.remove('bg-white','dark:bg-panel','text-deepTeal-600','border-gray-200','shadow-sm'); b.classList.add('text-gray-600','border-transparent'); });
             document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
             const t = document.getElementById(sideId);
@@ -3671,6 +3721,139 @@
         }
         function spiffRenameTeam(i, val) { if (spiffData.teams[i] != null) { spiffData.teams[i] = val; saveSpiff(); } }
         function spiffDelTeam(i) { spiffData.teams.splice(i, 1); renderSpiffTeams(); renderSpiff(); saveSpiff(); }
+
+        /* ===================== AUDIT LOG (leaders only) =====================
+           Reads through audit_visible(), which is gated by _auth_leader server-side.
+           The table itself has RLS with no policies, so it can't be read, edited or
+           deleted directly from the client — this view is the only way in. */
+        let auditData = [];
+
+        // Friendlier names than the raw table names, so the screen reads in plain
+        // language instead of database jargon.
+        const AUDIT_AREAS = {
+            users: 'Users & access', tasks: 'Tasks', aux_logs: 'AUX', attendance_logs: 'Attendance',
+            training_logs: 'Training', coaching: 'Coaching', coaching_logs: 'Coaching',
+            weekly: 'Weekly numbers', weekly_numbers: 'Weekly numbers',
+            departments: 'Departments', department_aux_limits: 'AUX limits', spiff: 'Spiff', spiff_data: 'Spiff'
+        };
+        const _auditArea = (t) => AUDIT_AREAS[t] || t;
+
+        async function openAudit() {
+            if (!currentIsLeader) { alert('Audit log is available to leaders only.'); return; }
+            ['numbers-view','coaching-view','overview-view','aux-view','training-view','attendance-view','spiff-view']
+                .forEach(id => document.getElementById(id).classList.add('hidden'));
+            _stopAuxTicker(); _stopTrainTicker(); _stopAttTicker();
+            _activateReportTab('tabAudit', 'mobileTabReports');
+            document.getElementById('audit-view').classList.remove('hidden');   // after _activateReportTab, which hides it
+            _fade(document.getElementById('audit-view'));
+            await loadAudit();
+        }
+
+        async function loadAudit() {
+            const tbl = document.getElementById('auditTable').value || null;
+            const lim = parseInt(document.getElementById('auditLimit').value) || 250;
+            const { data, error } = await _client.rpc('audit_visible', { p_pin: currentPin, p_limit: lim, p_table: tbl });
+            if (error) { connectionToast('Could not load the audit log.'); auditData = []; }
+            else auditData = data || [];
+            renderAudit();
+        }
+
+        // Describes an entry in plain language. For an update we diff the two JSON
+        // payloads and name only the fields that actually changed — the raw before/
+        // after blobs are unreadable at a glance.
+        function _auditChangeText(r) {
+            const skip = new Set(['id','created_at','updated_at']);
+            if (r.action === 'DELETE') {
+                const o = r.old_data || {};
+                const label = o.agent || o.manager_name || o.name || o.description || o.topic || '';
+                return 'Deleted' + (label ? ': ' + label : '');
+            }
+            if (r.action === 'INSERT') {
+                const n = r.new_data || {};
+                const label = n.agent || n.manager_name || n.name || n.description || n.topic || '';
+                return 'Created' + (label ? ': ' + label : '');
+            }
+            const o = r.old_data || {}, n = r.new_data || {};
+            const changed = Object.keys(n).filter(k => !skip.has(k) && JSON.stringify(o[k]) !== JSON.stringify(n[k]));
+            if (!changed.length) return 'Updated';
+            // Database timestamps read as noise (2026-09-07T16:23:43Z), so show them
+            // as a readable clock time in the business timezone like the rest of the app.
+            const fmt = (v) => {
+                if (v === null || v === undefined || v === '') return '—';
+                const s = String(v);
+                if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(s)) return _bizDateDisplay(s) + ' ' + _bizTime(s);
+                return s.length > 28 ? s.slice(0, 28) + '…' : s;
+            };
+            return changed.slice(0, 4).map(k => `${k}: ${fmt(o[k])} → ${fmt(n[k])}`)
+                .join(' · ') + (changed.length > 4 ? ` (+${changed.length - 4} more)` : '');
+        }
+
+        function renderAudit() {
+            // Keep the area filter populated from what's actually in the log.
+            const sel = document.getElementById('auditTable');
+            if (sel && sel.options.length <= 1) {
+                const seen = [...new Set(auditData.map(r => r.table_name))].sort();
+                seen.forEach(t => {
+                    const o = document.createElement('option');
+                    o.value = t; o.textContent = _auditArea(t);
+                    sel.appendChild(o);
+                });
+            }
+
+            const sum = document.getElementById('audit-summary');
+            if (sum) {
+                const actors = new Set(auditData.map(r => r.actor).filter(Boolean));
+                const dels = auditData.filter(r => r.action === 'DELETE').length;
+                sum.innerHTML = auditData.length
+                    ? `<div class="flex flex-wrap gap-2">
+                        <span class="chip">${auditData.length} entries</span>
+                        <span class="chip">${actors.size} ${actors.size === 1 ? 'person' : 'people'}</span>
+                        <span class="chip">${dels} ${dels === 1 ? 'deletion' : 'deletions'}</span>
+                       </div>`
+                    : '';
+            }
+
+            const body = document.getElementById('audit-body');
+            if (!auditData.length) {
+                body.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400 dark:text-gray-500 text-sm">Nothing logged for this selection yet.</td></tr>`;
+                return;
+            }
+            const tone = a => a === 'DELETE' ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10'
+                : a === 'INSERT' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10'
+                : 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-500/10';
+            const verb = a => a === 'DELETE' ? 'Deleted' : a === 'INSERT' ? 'Created' : 'Updated';
+            body.innerHTML = auditData.map(r => `<tr class="border-b border-gray-100 dark:border-borderline/60">
+                <td class="py-2.5 px-4 text-gray-600 dark:text-gray-300 whitespace-nowrap tabular-nums">${_esc(_bizDateDisplay(r.at))} ${_esc(_bizTime(r.at))}</td>
+                <td class="py-2.5 px-3 font-medium text-gray-800 dark:text-gray-100">${_esc(r.actor || '—')}</td>
+                <td class="py-2.5 px-3"><span class="text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full whitespace-nowrap ${tone(r.action)}">${_esc(verb(r.action))}</span></td>
+                <td class="py-2.5 px-3 text-gray-600 dark:text-gray-300 whitespace-nowrap">${_esc(_auditArea(r.table_name))}</td>
+                <td class="py-2.5 px-3 text-gray-600 dark:text-gray-300">${_esc(_auditChangeText(r))}</td>
+            </tr>`).join('');
+        }
+
+        function _buildAuditRows() {
+            return auditData.map(r => ({
+                'When': _bizDateDisplay(r.at) + ' ' + _bizTime(r.at),
+                'Who': r.actor || '',
+                'Action': r.action,
+                'Area': _auditArea(r.table_name),
+                'Record Id': r.row_pk || '',
+                'What changed': _auditChangeText(r),
+                'Before (raw)': r.old_data ? JSON.stringify(r.old_data) : '',
+                'After (raw)': r.new_data ? JSON.stringify(r.new_data) : ''
+            }));
+        }
+
+        async function exportAuditExcel() {
+            if (!auditData.length) { alert('Nothing in the audit log to export.'); return; }
+            await ensureXLSX();
+            const rows = _buildAuditRows();
+            const wb = window.XLSX.utils.book_new();
+            const ws = window.XLSX.utils.json_to_sheet(rows);
+            _autoFitCols(ws, rows);
+            window.XLSX.utils.book_append_sheet(wb, ws, 'Audit');
+            window.XLSX.writeFile(wb, `${_exportPrefix()}_AuditLog_${_stamp()}.xlsx`);
+        }
 
         /* ===================== ADMIN (leaders only) ===================== */
         let adminUsers = [], adminDepts = [];
