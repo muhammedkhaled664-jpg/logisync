@@ -1415,7 +1415,7 @@
 
                 updateBadge();
                 loadTasks();
-                _startIdle();   // begin the inactivity auto-logout countdown
+                _startIdle();   // no-op: inactivity auto-logout is disabled
                 if(!liveSyncInterval) liveSyncInterval = setInterval(() => { if (!document.hidden) loadTasks(); }, 10000);
                 // Weekly backup reminder
                 const _lastBk = parseInt(localStorage.lastBackup || 0);
@@ -1516,21 +1516,11 @@
         }
         function _release(key) { _inflight.delete(key); }
 
-        // ---- Idle auto sign-out ----
-        // Signs the user out after a stretch of no interaction, so an unattended
-        // shared/floor machine doesn't sit logged in. Any input resets the timer.
-        let _idleTimer = null;
-        const IDLE_MS = 30 * 60 * 1000; // 30 minutes
-        const _IDLE_EVENTS = ['click', 'keydown', 'mousemove', 'touchstart', 'scroll'];
-        function _resetIdle() {
-            if (!currentPin) return;
-            if (_idleTimer) clearTimeout(_idleTimer);
-            _idleTimer = setTimeout(() => {
-                if (currentPin) { toast('Signed out after 30 minutes of inactivity.', 'info', 5000); logout(); }
-            }, IDLE_MS);
-        }
-        function _startIdle() { _IDLE_EVENTS.forEach(ev => window.addEventListener(ev, _resetIdle, { passive: true })); _resetIdle(); }
-        function _stopIdle() { if (_idleTimer) { clearTimeout(_idleTimer); _idleTimer = null; } _IDLE_EVENTS.forEach(ev => window.removeEventListener(ev, _resetIdle)); }
+        // ---- Idle auto sign-out: DISABLED ----
+        // Sessions stay signed in until the user explicitly logs out. Kept as
+        // no-op stubs so the call sites in login()/logout() remain valid.
+        function _startIdle() { /* disabled */ }
+        function _stopIdle()  { /* disabled */ }
 
         function applyTaskScope(rows) {
             const me = _lc(currentUser);
