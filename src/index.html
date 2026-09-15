@@ -1320,6 +1320,7 @@
                 `<option value="${p}">${p === 'CRITICAL' ? 'Critical' : p}</option>`).join('');
         }
         document.addEventListener('DOMContentLoaded', applyClientConfig);
+        document.addEventListener('DOMContentLoaded', _restoreSession);
 
         function updateClock() { 
             document.getElementById('clock').innerText = new Date().toLocaleTimeString([], {hour12: false}); 
@@ -1327,12 +1328,39 @@
         setInterval(updateClock, 1000); 
         updateClock();
 
-        async function login() {
-            const username = document.getElementById('usernameInput').value.trim();
-            const pin = document.getElementById('pinInput').value.trim();
+        // ---- Session persistence ----
+        // The session lived only in memory, so any reload — and on phones, the OS
+        // quietly discarding a backgrounded tab — dumped the user back at the login
+        // screen. Credentials are stashed in sessionStorage: per-tab, and wiped when
+        // the browser closes, so a shared floor PC doesn't stay signed in for the
+        // next person. On load we silently re-run verify_login; the server still
+        // re-validates, so a changed or revoked PIN fails the restore.
+        const SESSION_KEY = 'logisync.session';
+        function _saveSession(username, pin) {
+            try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ u: username, p: pin })); } catch (e) {}
+        }
+        function _clearSession() {
+            try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+        }
+        function _readSession() {
+            try {
+                const o = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+                return (o && o.u && o.p) ? o : null;
+            } catch (e) { return null; }
+        }
+        async function _restoreSession() {
+            const saved = _readSession();
+            if (!saved) return;
+            const ok = await login({ username: saved.u, pin: saved.p });
+            if (!ok) _clearSession();
+        }
+
+        async function login(_restore) {
+            const username = _restore ? _restore.username : document.getElementById('usernameInput').value.trim();
+            const pin      = _restore ? _restore.pin      : document.getElementById('pinInput').value.trim();
             const errorMsg = document.getElementById('login-error');
-            
-            if(!username || !pin) return;
+
+            if(!username || !pin) return false;
 
             const { data, error } = await _client.rpc('verify_login', { p_username: username, p_pin: pin });
 
@@ -1413,6 +1441,8 @@
                     document.getElementById('mTabAudit').classList.add('hidden');
                 }
 
+                _saveSession(username, pin);
+
                 updateBadge();
                 loadTasks();
                 _startIdle();   // no-op: inactivity auto-logout is disabled
@@ -1420,9 +1450,15 @@
                 // Weekly backup reminder
                 const _lastBk = parseInt(localStorage.lastBackup || 0);
                 if (Date.now() - _lastBk > 7 * 24 * 3600 * 1000) setTimeout(() => toast('Reminder: back up your data — “Backup All Data” in the sidebar.', 'info', 6500), 1800);
-            } else { 
-                errorMsg.innerText = "Invalid Username or Passcode";
-                errorMsg.classList.remove('hidden'); 
+                return true;
+            } else {
+                // A failed restore stays silent — the user never typed anything, so
+                // flashing "Invalid Username or Passcode" at them would be confusing.
+                if (!_restore) {
+                    errorMsg.innerText = "Invalid Username or Passcode";
+                    errorMsg.classList.remove('hidden');
+                }
+                return false;
             }
         }
 
@@ -1437,6 +1473,7 @@
             document.getElementById('bottom-nav').classList.add('hidden');
             document.getElementById('fab-add').classList.add('hidden');
             if(liveSyncInterval) { clearInterval(liveSyncInterval); liveSyncInterval = null; }
+            _clearSession();
             _stopIdle();
         }
 
