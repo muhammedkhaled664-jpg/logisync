@@ -1330,29 +1330,46 @@
 
         // ---- Session persistence ----
         // The session lived only in memory, so any reload — and on phones, the OS
-        // quietly discarding a backgrounded tab — dumped the user back at the login
-        // screen. Credentials are stashed in sessionStorage: per-tab, and wiped when
-        // the browser closes, so a shared floor PC doesn't stay signed in for the
-        // next person. On load we silently re-run verify_login; the server still
-        // re-validates, so a changed or revoked PIN fails the restore.
+        // discarding a backgrounded tab — dumped the user back at the login screen.
+        //
+        // This uses localStorage, not sessionStorage: sessionStorage is scoped to a
+        // single tab, so a phone opening the app from a bookmark or home-screen
+        // shortcut, or relaunching the browser after Android/iOS killed it, starts
+        // with an empty store and the restore never fires. That is the normal case
+        // on a phone, which is exactly who this is for.
+        //
+        // The trade: a shared floor PC now stays signed in as the last person until
+        // they hit the logout button. The server still re-validates the PIN on every
+        // restore, so a changed or revoked PIN kills the session.
         const SESSION_KEY = 'logisync.session';
+        let _loginTransportError = false;   // last login failed to reach the server
         function _saveSession(username, pin) {
-            try { sessionStorage.setItem(SESSION_KEY, JSON.stringify({ u: username, p: pin })); } catch (e) {}
+            try { localStorage.setItem(SESSION_KEY, JSON.stringify({ u: username, p: pin })); } catch (e) {}
         }
         function _clearSession() {
-            try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}
+            try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+            try { sessionStorage.removeItem(SESSION_KEY); } catch (e) {}   // legacy store
         }
         function _readSession() {
             try {
-                const o = JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null');
+                const raw = localStorage.getItem(SESSION_KEY) || sessionStorage.getItem(SESSION_KEY);
+                const o = JSON.parse(raw || 'null');
                 return (o && o.u && o.p) ? o : null;
             } catch (e) { return null; }
         }
         async function _restoreSession() {
             const saved = _readSession();
             if (!saved) return;
-            const ok = await login({ username: saved.u, pin: saved.p });
-            if (!ok) _clearSession();
+            // Only a genuine rejection from the server clears the stored session. A
+            // phone handing off between wifi and data fails the request without the
+            // PIN being wrong, and wiping the session on that would sign the agent
+            // out for good over a momentary blip.
+            for (let attempt = 0; attempt < 3; attempt++) {
+                if (await login({ username: saved.u, pin: saved.p })) return;
+                if (!_loginTransportError) { _clearSession(); return; }
+                await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+            }
+            // Still unreachable — keep the session and let the next load retry.
         }
 
         async function login(_restore) {
@@ -1363,6 +1380,11 @@
             if(!username || !pin) return false;
 
             const { data, error } = await _client.rpc('verify_login', { p_username: username, p_pin: pin });
+
+            // Distinguishes "the server said no" from "we never reached the server",
+            // so a session restore doesn't discard good credentials on a dropped
+            // connection. See _restoreSession.
+            _loginTransportError = !!error;
 
             if (!error && data && data.length > 0) {
                 currentUser = (data[0].manager_name || 'Agent').trim();
