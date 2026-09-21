@@ -91,9 +91,21 @@ The only fully reliable check is the browser: apply the class to an element and
 confirm the computed style actually changes.
 
 **2. Always escape user text before `innerHTML`.**
-Use the existing `esc()` / `_esc()` helpers. A stored-XSS bug (unescaped task
-descriptions in the shared feed) was found and fixed here; it is very easy to
-reintroduce by copy-pasting a render function.
+Three helpers, and picking the wrong one is a security bug:
+
+| Helper | Use for |
+|---|---|
+| `esc(s)` | Text and attribute values. Escapes `& < > "` |
+| `_esc(s)` | Same, plus `'` |
+| `_jsAttr(s)` | **Values going inside an inline handler**, e.g. `onclick="fn('${_jsAttr(name)}')"` |
+
+`_jsAttr` exists because escaping only `'` is not enough — the handler sits in a
+double-quoted attribute, so a name containing `"` escapes the attribute and the
+rest is parsed as markup. It JS-escapes first, then HTML-escapes.
+
+A stored-XSS bug (unescaped task descriptions in the shared feed) and an
+attribute-escape bug (agent names in `onclick` handlers) have both been found and
+fixed here. Both are easy to reintroduce by copy-pasting a render function.
 
 **3. The client is not the security boundary.**
 Hiding a button does nothing. If an action must be restricted, it must be enforced
@@ -117,13 +129,11 @@ gh auth switch --user muhammedkhaled664-jpg             # if it's the wrong one
   and the `_auth_user` wrapper) was applied directly in the Supabase SQL Editor
   and exists **only in the live database**. If that project were lost, git could
   not restore it.
-- **Dead CSS.** `disabled:opacity-40`, `divide-y`, `first:ml-0` and several hover
-  utilities are used in the markup but missing from the stylesheet, so disabled
-  buttons look enabled and some lists render without separator lines.
-- **Unescaped names.** Roster names are still interpolated raw into a few
-  `onclick="fn('name')"` attributes with only single quotes escaped.
 - **Shared-PC auto-login.** Sessions persist in `localStorage`, so a shared floor
   machine stays signed in as the last person until someone signs out.
+- **Restore race.** A session restore retries for up to ~6 seconds; a manual login
+  during that window can be overwritten when the restore completes afterwards.
+- **No tests.** Verification is manual, in a browser.
 
 ## Security model
 

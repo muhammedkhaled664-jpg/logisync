@@ -284,6 +284,27 @@
            colors already compiled in this file (deepTeal is numerically
            identical to Tailwind's standard teal palette; flare = rose-500).
            ===================================================================== */
+        /* --- Second gap round (found by probing computed styles on the live page,
+               not by reading the stylesheet: each of these was applying nothing).
+               divide-* needs Tailwind's "every child after the first" selector;
+               borderline is rgb(30 41 59), matching border-borderline already
+               compiled in tailwind.build.css. --- */
+        .divide-y>:not([hidden])~:not([hidden]){border-top-width:1px;border-bottom-width:0}
+        .divide-gray-100>:not([hidden])~:not([hidden]){border-color:#f3f4f6}
+        .dark\:divide-borderline:is(.dark *)>:not([hidden])~:not([hidden]){border-color:rgb(30 41 59)}
+        .disabled\:opacity-40:disabled{opacity:.4}
+        .disabled\:cursor-not-allowed:disabled{cursor:not-allowed}
+        .-bottom-0\.5{bottom:-.125rem}.-right-0\.5{right:-.125rem}
+        .first\:ml-0:first-child{margin-left:0}
+        .align-top{vertical-align:top}
+        .pr-6{padding-right:1.5rem}
+        .border-l{border-left-width:1px}
+        .hover\:bg-blue-50:hover{background-color:#eff6ff}
+        .hover\:text-blue-500:hover{color:#3b82f6}
+        .hover\:text-amber-600:hover{color:#d97706}
+        .dark\:hover\:bg-blue-500\/10:is(.dark *):hover{background-color:rgba(59,130,246,.1)}
+        .dark\:hover\:text-amber-500:is(.dark *):hover{color:#f59e0b}
+
         .grid-cols-3{grid-template-columns:repeat(3,minmax(0,1fr))}
         .h-3{height:.75rem}.w-3{width:.75rem}
         .h-6{height:1.5rem}.w-6{width:1.5rem}
@@ -1418,7 +1439,7 @@
                 // Assignee list is the Users roster (see populateAssignDropdown), loaded
                 // asynchronously by loadVisibleMembers(). Seed with the current user so the
                 // control is never empty until the roster arrives.
-                mInput.innerHTML = `<option value="${currentUser}">${currentUser}</option>`;
+                mInput.innerHTML = `<option value="${esc(currentUser)}">${esc(currentUser)}</option>`;
                 mInput.value = currentUser;
 
                 // Leaders and managers may delegate; agents are locked to themselves.
@@ -1638,7 +1659,7 @@
 
             const item = (label, key, icon) => {
                 const active = (taskScopeMember || '') === (key || '');
-                return `<button onclick="selectTaskMember(${key === null ? 'null' : `'${String(key).replace(/'/g, "\\'")}'`})"
+                return `<button onclick="selectTaskMember(${key === null ? 'null' : `'${_jsAttr(key)}'`})"
                     class="flex items-center gap-2.5 text-left py-2 px-3 rounded-lg font-medium text-sm transition-all border ${active
                         ? 'bg-deepTeal-600 text-white border-deepTeal-600 shadow-sm'
                         : 'text-gray-600 dark:text-gray-300 border-transparent hover:bg-white dark:hover:bg-panel'}">
@@ -2551,7 +2572,7 @@
             const names = _visibleRoster();
             bar.innerHTML = names.map(n => {
                 const active = n === window._numAgent;
-                return `<button onclick="selectNumAgent('${n.replace(/'/g, "\\'")}')" class="whitespace-nowrap text-xs font-medium px-4 py-2 rounded-lg border transition-colors ${active ? 'bg-deepTeal-600 text-white border-deepTeal-600 shadow-sm' : 'bg-white dark:bg-panel text-gray-600 dark:text-gray-300 border-gray-200 dark:border-borderline hover:bg-gray-50 dark:hover:bg-base'}">${n}</button>`;
+                return `<button onclick="selectNumAgent('${_jsAttr(n)}')" class="whitespace-nowrap text-xs font-medium px-4 py-2 rounded-lg border transition-colors ${active ? 'bg-deepTeal-600 text-white border-deepTeal-600 shadow-sm' : 'bg-white dark:bg-panel text-gray-600 dark:text-gray-300 border-gray-200 dark:border-borderline hover:bg-gray-50 dark:hover:bg-base'}">${_esc(n)}</button>`;
             }).join('');
         }
 
@@ -2970,7 +2991,7 @@
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${_esc(agent)}</span>
                     <div class="flex items-center gap-2 shrink-0">
                         <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Available</span>
-                        <select onchange="if(this.value){startAux('${agent.replace(/'/g, "\\'")}',this.value);this.value='';}" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium pl-2 pr-6 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                        <select onchange="if(this.value){startAux('${_jsAttr(agent)}',this.value);this.value='';}" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium pl-2 pr-6 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 outline-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
                             <option value="">Start aux…</option>
                             ${AUX_TYPES.map(t => `<option value="${_esc(t)}">${_esc(t)}</option>`).join('')}
                         </select>
@@ -3284,7 +3305,7 @@
                     <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${_esc(agent)}</span>
                     <div class="flex items-center gap-2 shrink-0">
                         <span class="text-[10px] font-bold uppercase tracking-wide text-emerald-600 dark:text-emerald-400">Available</span>
-                        <button onclick="startTraining('${agent.replace(/'/g, "\\'")}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 hover:bg-deepTeal-50 hover:text-deepTeal-600 dark:hover:bg-deepTeal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-play mr-1"></i>Start training</button>
+                        <button onclick="startTraining('${_jsAttr(agent)}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-medium px-2.5 py-1.5 rounded-lg bg-gray-50 dark:bg-base border border-gray-200 dark:border-borderline text-gray-600 dark:text-gray-300 hover:bg-deepTeal-50 hover:text-deepTeal-600 dark:hover:bg-deepTeal-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-play mr-1"></i>Start training</button>
                     </div>
                 </div>`).join('')}
             </div>` : '';
@@ -3527,7 +3548,7 @@
             const attOutHtml = attOut.length ? `<div class="bg-white dark:bg-panel rounded-xl border border-gray-200 dark:border-borderline shadow-sm divide-y divide-gray-100 dark:divide-borderline">
                 ${attOut.map(agent => {
                     const btn = onPC
-                        ? `<button onclick="checkIn('${agent.replace(/'/g, "\\'")}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-deepTeal-600 hover:bg-deepTeal-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-right-to-bracket mr-1"></i>Check in</button>`
+                        ? `<button onclick="checkIn('${_jsAttr(agent)}')" ${isToday ? '' : 'disabled'} class="text-[11px] font-semibold px-2.5 py-1.5 rounded-lg bg-deepTeal-600 hover:bg-deepTeal-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"><i class="fa-solid fa-right-to-bracket mr-1"></i>Check in</button>`
                         : `<span class="text-[10px] font-medium text-gray-400"><i class="fa-solid fa-desktop mr-1"></i>PC only</span>`;
                     return `<div class="flex items-center justify-between gap-3 px-4 py-2.5">
                         <span class="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">${_esc(agent)}</span>
@@ -4182,6 +4203,23 @@
         function fmtDate(d) { if (!d) return ''; const o = new Date(d + 'T00:00:00'); return isNaN(o) ? d : o.toLocaleDateString([], { month: 'numeric', day: 'numeric', year: '2-digit' }); }
         function esc(s) { return (s == null ? '' : String(s)).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
+        // Makes a value safe inside an inline handler: onclick="fn('${_jsAttr(v)}')"
+        //
+        // Escaping only ' (what this file used to do) is not enough: the handler sits
+        // in a double-quoted HTML attribute, so a name containing " or > escapes the
+        // attribute entirely and the rest is parsed as markup.
+        //
+        // Order matters. JS-escape first so the value can't terminate the string
+        // literal, then HTML-escape so it can't terminate the attribute. The browser
+        // decodes entities before the JS parser sees the attribute, so a backslash
+        // written here as \&#39; arrives at the parser as \' — a correct escape.
+        // Declared as a function (not const) so it is hoisted above its callers.
+        function _jsAttr(s) {
+            const js = String(s == null ? '' : s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return js.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
         function renderCoaching() {
             const q = (document.getElementById('coachSearch').value || '').toLowerCase().trim();
             const fa = document.getElementById('coachFilterAgent').value;
@@ -4637,11 +4675,11 @@
             // Leaderboard + focus
             const ranked = [...curR.rows].sort((a,b) => b.avg - a.avg);
             const bar = (n,v) => { const col = v>=target ? '#14b8a6' : v>=target-10 ? '#f59e0b' : '#f43f5e';
-                return `<div style="display:flex;align-items:center;gap:14px;margin-bottom:13px"><div style="width:90px;font-size:19px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${n}</div><div style="flex:1;height:13px;background:#1b2740;border-radius:8px;overflow:hidden"><div style="width:${Math.min(100,v)}%;height:100%;background:${col};border-radius:8px"></div></div><div style="width:62px;text-align:right;font-size:19px;font-weight:800;color:${col}">${v.toFixed(1)}%</div></div>`; };
+                return `<div style="display:flex;align-items:center;gap:14px;margin-bottom:13px"><div style="width:90px;font-size:19px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${_esc(n)}</div><div style="flex:1;height:13px;background:#1b2740;border-radius:8px;overflow:hidden"><div style="width:${Math.min(100,v)}%;height:100%;background:${col};border-radius:8px"></div></div><div style="width:62px;text-align:right;font-size:19px;font-weight:800;color:${col}">${v.toFixed(1)}%</div></div>`; };
             document.getElementById('lm-leaders').innerHTML = ranked.slice(0,5).map(r => bar(r.agent, r.avg)).join('') || '<div style="color:#64748b;font-style:italic">No numbers entered yet this month.</div>';
             const below = ranked.filter(r => r.avg < target).sort((a,b)=>a.avg-b.avg).slice(0,3);
             document.getElementById('lm-focus').innerHTML = below.length
-                ? below.map(r => `<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #2a1822"><span style="font-size:21px;font-weight:800;color:#fecdd3">${r.agent}</span><span style="font-size:25px;font-weight:900;color:#f43f5e">${r.avg.toFixed(1)}%</span></div>`).join('') + '<div style="margin-top:12px;font-size:13px;color:#9f7686;font-weight:600">Below ' + target + '% target — coaching focus</div>'
+                ? below.map(r => `<div style="display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #2a1822"><span style="font-size:21px;font-weight:800;color:#fecdd3">${_esc(r.agent)}</span><span style="font-size:25px;font-weight:900;color:#f43f5e">${r.avg.toFixed(1)}%</span></div>`).join('') + '<div style="margin-top:12px;font-size:13px;color:#9f7686;font-weight:600">Below ' + target + '% target — coaching focus</div>'
                 : '<div style="color:#86efac;font-size:18px;font-weight:700;padding:14px 0">✓ All agents at or above target</div>';
 
             // ---- Build per-agent dataset for the rotating Agent Spotlight ----

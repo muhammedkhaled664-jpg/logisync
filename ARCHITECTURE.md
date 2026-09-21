@@ -60,6 +60,27 @@ Naming convention: functions prefixed `_` are internal helpers
 (`_bizDate`, `_guard`, `_buildAuxRows`); unprefixed ones are user-facing actions
 usually wired to an `onclick` (`startAux`, `checkIn`, `openAudit`).
 
+### Escaping, and the three contexts
+
+Rendering is string concatenation into `innerHTML`, so escaping is manual and
+choosing the wrong helper is a security bug:
+
+| Helper | Escapes | Context |
+|---|---|---|
+| `esc(s)` | `& < > "` | Text nodes and plain attribute values |
+| `_esc(s)` | `& < > " '` | Same, when the value may contain apostrophes |
+| `_jsAttr(s)` | JS-escape, then HTML-escape | Values inside an inline handler |
+
+`_jsAttr` covers the case the other two cannot. A handler like
+`onclick="startTraining('NAME')"` has a JS string nested inside an HTML
+attribute, so the value must survive **two** parsers. Escaping only `'` — which
+this file did originally — leaves `"` free to terminate the attribute, after
+which the browser parses the remainder as markup and any `onmouseover=` in the
+name becomes a live handler. `_jsAttr` JS-escapes first (so the value cannot end
+the string literal) then HTML-escapes (so it cannot end the attribute); because
+the browser decodes entities before the JS parser runs, the escapes arrive in the
+correct order and the handler still receives the original value unchanged.
+
 ---
 
 ## 2. Authentication
@@ -315,10 +336,9 @@ If you reintroduce caching, you own the cache-busting problem.
   database, not in `scripts/migrations/`. The repo cannot rebuild the backend.
 - **`tailwind.build.css` is unmanaged.** A static, hand-patched artifact with no
   source config. Classes not already present silently do nothing.
-- **Names are not consistently escaped.** Several `onclick="fn('name')"`
-  attributes escape only single quotes, so a name containing `"` or `<` breaks
-  out. Writing names requires leader access, which limits but does not remove it.
 - **No tests.** Verification is manual, done in a browser against production.
+- **Session restore race.** The restore retries for ~6 seconds and can overwrite
+  a login performed manually during that window.
 - **Dead code has been mistaken for cruft before.** `parkStaleTasks()` and
   `importTasks()` were fully implemented with no UI caller for a long time. If you
   find a function with no `onclick` anywhere, check whether it is a real feature
